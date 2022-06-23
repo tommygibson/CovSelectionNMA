@@ -1,0 +1,80 @@
+### jags code for AB-NMA model with the special cholesky decomposition from cai/dunson 2006
+### no spike/slab on priors yet
+
+data
+{
+  gamma.ind <- (ntrt * (ntrt - 1)) / 2
+}
+
+model
+{
+  for(i in 1:len){
+    r[i] ~ dbin(p[i], totaln[i]) # likelihood
+    logit(p[i]) <- mu[t[i]] + vi[s[i], t[i]] # linear model
+  }
+  
+  for(j in 1:ntrt){
+    mu[j] ~ dnorm(0, 0.01) # weakly informative priors for mean logit(risk)
+  }
+  
+  for(k in 1:nstudy){
+    vi[k,1:ntrt] ~ dmnorm.vcov(zeros[1:ntrt], Sigma[1:ntrt, 1:ntrt]) # multivariate normal prior for random effects for each study
+  }
+  
+  
+  # covariance decomposition as in Chen and Dunson (2006)
+  # special cholesky decomp Sigma = Lambda %*% Gamma %*% t(Gamma) %*% Lambda
+  for(i in 1:gamma.ind){
+    gamma[i] <- dnorm(0, 1)
+  }
+  
+  for(i in 1:(ntrt - 1)){
+    lambda[i] ~ dnorm(0, .1)T(0,)
+    Gamma[i, i] <- 1
+    Lambda[i, i] <- lambda[i]
+    for(j in (i + 1):ntrt){
+      Gamma[i, j] <- 0
+      Lambda[i, j] <- 0
+      Lambda[j, i] <- 0
+
+      Gamma[j, i] <- gamma[((j - 1) * (j - 2)) / 2 + i]
+    }
+  }
+  for(i in ntrt){
+    lambda[i] ~ dnorm(0, 1)T(0,)
+    Gamma[i, i] <- 1
+    Lambda[i, i] <- lambda[i]
+  }
+ 
+  # Sigma <- Lambda %*% Gamma %*% t(Gamma) %*% Lambda
+  
+  for(i in 1){
+    Sigma[i, i] <- pow(Lambda[i, i], 2)
+    for(j in (i + 1):ntrt){
+      Sigma[i, j] <- Lambda[i, i] * Lambda[j, j] * Gamma[j, i]
+      Sigma[j, i] <- Sigma[i, j]
+    }
+  }
+  for(i in 2:ntrt){
+    Sigma[i, i] <- Lambda[i, i] * Lambda[i, i] * (Gamma[i, i] + inprod(Gamma[i, 1:(i - 1)], Gamma[i, 1:(i - 1)]))
+    
+    for(j in (i + 1):ntrt){
+      Sigma[i, j] <- Lambda[i, i] * Lambda[j, j] * (Gamma[j, i] + inprod(Gamma[i, 1:(i - 1)], Gamma[j, 1:(i - 1)]))
+      Sigma[j, i] <- Sigma[i, j]
+    }
+  }
+
+  for(j in 1:ntrt){
+    AR[j] = ilogit(mu[j]/ sqrt(1 + Sigma [j,j] * 256 / (75 * pi * pi)))
+    SD[j] = sqrt(Sigma[j,j])
+    MU[j] = mu[j]
+    
+    for(k in 1:ntrt){
+      OR[j,k] = AR[j] / (1 - AR[j]) / AR[k] * (1 - AR[k])
+      LOR[j,k] = log(OR[j,k])
+      cLOR [j,k] = MU[j] - MU[k]
+      CORR [j,k] = Sigma[j,k] / SD[j] / SD[k]
+    }
+  }
+  
+}

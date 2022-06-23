@@ -1,0 +1,35 @@
+### jags code for AB-NMA model with standard inverse wishart prior
+
+model
+{
+  for(i in 1:len){
+    r[i] ~ dbin(p[i], totaln[i]) # likelihood
+    logit(p[i]) = mu[t[i]] + vi[s[i], t[i]] # linear model
+  }
+  
+  for(j in 1:ntrt){
+    mu[j] ~ dnorm(0, 0.01) # weakly informative priors for mean logit(risk)
+  }
+  
+  for(k in 1:nstudy){
+    vi[k,1:ntrt] ~ dmnorm(zeros, Omega) # multivariate normal prior for random effects for each study
+  }
+  
+  Omega ~ dwish(Lambda, nu) # wishart prior on precision matrix
+  
+  Sigma = inverse(Omega)
+  
+  for(j in 1:ntrt){
+    AR[j] = ilogit(mu[j]/ sqrt(1 + Sigma [j,j] * 256 / (75 * pi * pi)))
+    SD[j] = sqrt(Sigma[j,j])
+    MU[j] = mu[j]
+    
+    for(k in 1:ntrt){
+      OR[j,k] = AR[j] / (1 - AR[j]) / AR[k] * (1 - AR[k])
+      LOR[j,k] = log(OR[j,k])
+      cLOR [j,k] = MU[j] - MU[k]
+      CORR [j,k] = Sigma[j,k] / SD[j] / SD[k]
+    }
+  }
+  
+}
