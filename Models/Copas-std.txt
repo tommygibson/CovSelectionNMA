@@ -1,0 +1,41 @@
+### Bai Copas model with likelihood calculation
+
+data
+{
+  for(i in 1:S){
+    s2[i] = s[i] ^ 2
+  }
+
+  s.max = max(s)
+}
+
+model
+{
+  for(i in 1:S){
+    y[i] ~ dnorm(mean.y[i], prec.y[i])
+    z[i] ~ dnorm(u[i], 1) T(0,)
+    
+    mean.y[i] = theta0 + rho * s[i] * (z[i] - u[i])
+    prec.y[i] = 1 / var.y[i]
+    var.y[i] = tau2 + s2[i] * (1 - (rho ^ 2))
+    
+    u[i] = gamma0 + gamma1 / s[i]
+    
+    # calculating log-likelihood
+    rho_bar[i] = rho * s[i] / sqrt(tau2 + s2[i])
+    v[i] = (u[i] + rho_bar[i] * (y[i] - theta0) / sqrt(tau2 + s2[i])) / sqrt(1 - rho_bar[i] ^ 2)
+    loglik[i] = log(pnorm(v[i], 0, 1)) + log(dnorm(y[i], theta0, 1 / (tau2 + s2[i]))) - log(pnorm(u[i], 0, 1))
+    
+  }
+  
+  gamma0 ~ dunif(-2, 2)
+  gamma1 ~ dunif(0, s.max)
+  
+  theta0 ~ dnorm(0, 0.01)
+  
+  # tau prior is specified in Bai 2020
+  tau ~ dt(0, 1, 1) T(0,)
+  tau2 = tau ^ 2
+  rho ~ dunif(-1, 1)
+
+}
