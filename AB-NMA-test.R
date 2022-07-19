@@ -141,6 +141,8 @@ ab.select.fit <- do.call(jags.parallel,
 
 
 ########
+
+set.seed(714) # like babe ruth
 nma.dat.1 <- dat.dong2013
 len <- dim(nma.dat.1)[1]
 ntrt <- length(unique(nma.dat.1$treatment))
@@ -159,6 +161,22 @@ stan.dat.1 <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
                    higher_better = 0, zeros = zeros,
                    Lambda = Lambda, 
                    nu = nu)
+
+reghorse.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
+                     s = s, r = r, totaln = totaln,
+                     higher_better = 0, zeros = zeros,
+                     scale_global_lambda = 1, scale_global_gamma = 1,
+                     nu_global_lambda = 1, nu_global_gamma = 1,
+                     nu_local_lambda = 1, nu_local_gamma = 1,
+                     slab_scale_lambda = 1, slab_df_lambda = 4,
+                     slab_scale_gamma = 1, slab_df_gamma = 4)
+reghorse.prior.dat <- list(ntrt = ntrt,
+                           scale_global_lambda = 1, scale_global_gamma = 1,
+                           nu_global_lambda = 1, nu_global_gamma = 1,
+                           nu_local_lambda = 1, nu_local_gamma = 1,
+                           slab_scale_lambda = 1, slab_df_lambda = 4,
+                           slab_scale_gamma = 1, slab_df_gamma = 4)
+
 jags.dat.1 <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
                    s = s, r = r, totaln = totaln, 
                    zeros = zeros, Lambda = Lambda, nu = nu, pi = pi)
@@ -169,11 +187,19 @@ ab.nma.inits <- function(){
 }
 
 ab.nma.stan <- stan_model(here("Models", "AB-NMA.stan"))
+ab.nma.reghorse <- stan_model(here("Models", "AB-NMA-regularized-horseshoe.stan"))
+reghorse.prior <- stan_model(here("Models", "regularized-horseshoe-prior.stan"))
 params <- c("LOR", "CORR")
+
+fit.reghorse.prior <- sampling(reghorse.prior, pars = c("SD", "CORR"), dat = reghorse.prior.dat,
+                               chains = 4, iter = 2000)
 
 
 fit.1.stan <- sampling(ab.nma.stan, pars = c("LOR", "CORR"), data = stan.dat.1, 
-                  iter = 8000, cores = 4, thin = 4)
+                  iter = 4000, cores = 4)
+fit.1.reghorse <- sampling(ab.nma.reghorse, pars = c("LOR", "CORR"), data = reghorse.dat,
+                           iter = 8000, warmup = 4000, cores = 4,
+                           control = list(adapt_delta = 0.99, max_treedepth = 18))
 fit.1.jags <- do.call(jags.parallel,
                       list(names(jags.dat.1), ab.nma.inits, params, 
                    model.file = here("Models", "AB-NMA.txt"),
@@ -235,5 +261,7 @@ LOR.mean.jags <- matrix(round(ab.select.fit$BUGSoutput$summary[37:72,2], 3), nro
 LOR.sd.stan <- matrix(round(summary(fit.1.stan, pars = c("LOR"))$summary[,3], 3), nrow = 6, byrow = F)
 LOR.sd.select <- matrix(round(ab.select.fit$BUGSoutput$summary[37:72,2], 3), nrow = 6, byrow = T)
 
-LOR.sd.stan - LOR.sd.select
-
+matrix(round(summary(fit.1.stan)$summary[1:36, 8] - summary(fit.1.stan)$summary[1:36, 4], 4), nrow = 6, byrow = TRUE)
+matrix(round(summary(fit.1.reghorse)$summary[1:36, 8] - summary(fit.1.reghorse)$summary[1:36, 4], 4), nrow = 6, byrow = TRUE)
+matrix(round(summary(fit.1.stan)$summary[37:72, 8] - summary(fit.1.stan)$summary[37:72, 4], 4), nrow = 6, byrow = TRUE)
+matrix(round(summary(fit.1.reghorse)$summary[37:72, 8] - summary(fit.1.reghorse)$summary[37:72, 4], 4), nrow = 6, byrow = TRUE)
