@@ -1,0 +1,40 @@
+
+model
+{
+  for(i in 1:S){
+    y[i,1] ~ dbin(pi[i,1], n[i,1])
+    y[i,2] ~ dbin(pi[i,2], n[i,2])
+    
+    # probability of exposure
+    n[i,1] ~ dbin(psi[i], n.tot[i])
+    
+    psi[i] <- 1 / (1 + exp(-nu[i]))
+    
+    # conditional prob of event given exposure
+    logit(pi[i,1]) <- beta[i] + delta[i]/2
+    logit(pi[i,2]) <- beta[i] - delta[i]/2
+    
+    delta[i] ~ dnorm(delta0, D.delta)
+    
+    nu[i] ~ dnorm(nu0, D.nu)
+    
+    beta[i] ~ dnorm(beta0, D.beta)
+    
+  }
+  
+  beta0 ~ dnorm(a, b)
+  delta0 ~ dnorm(c, d)
+  nu0 ~ dnorm(e, f)
+  
+  # half-cauchy priors on heterogeneity parameters
+  
+  D.beta <- pow(sigma.beta, -2)
+  D.nu <- pow(sigma.nu, -2)
+  D.delta <- pow(sigma.delta, -2)
+  
+  # half-t prior on sigma.delta
+  sigma.beta ~ dt(0, B.beta, 1) T(0,)
+  sigma.nu ~ dt(0, B.nu, 1) T(0,)
+  sigma.delta ~ dt(0, B.delta, 1) T(0,)
+  
+}
