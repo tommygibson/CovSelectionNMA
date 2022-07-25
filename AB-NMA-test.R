@@ -11,21 +11,24 @@ library(MASS)
 rstan_options("auto_write" = TRUE)
 options(mc.cores = 4)
 
-
 #### Generating a test dataset
-set.seed(616)
+set.seed(724)
 N <- 300
-ntrt <- 5
+ntrt <- 6
 nstudy <- 40
 
 # absolute mean effects for each treatment arm
-mu <- c(-1.75, -2, -2.5, -1.5, -2.75)
+mu <- c(-1.75, -2, -2.5, -1.5, -2.75, -1.25)
 # full mean matrix, because theoretically each study contained each arm and they're MCAR
 mu.tot <- matrix(rep(mu, nstudy), nrow = nstudy, byrow = TRUE)
 
 # construct covariance matrix of random effects with the Lambda %*% Gamma %*% t(Gamma) %*% Lambda formulation
-Lambda <- diag(c(0.3, 0.1, 0.4, 0.5, 0.2))
-gamma <- c(0.1, 0.4, 0.6, 0, 0, 0, 0.8, 0.2, 0.1, 0.2)
+Lambda <- diag(c(0.3, 0.001, 0.8, 0.5, 0.2, .001))
+gamma <- c(0.4, 
+           -0.4, 0.6, 
+           0, 0, 0, 
+           0.8, -0.2, 0, 0.2, 
+           0, 0, 0, 0, 0)
 Gamma <- diag(ntrt)
 index <- 1
 for(i in 2:ntrt){
@@ -63,8 +66,12 @@ for(i in 1:nstudy){
 non.missing.pattern <- matrix(0, nrow = nstudy, ncol = ntrt)
 non.missing.pattern[,1] <- 1
 for(i in 2:ntrt){
-  non.missing.pattern[, i] <- c(rep(0, 10 * (i - 2)), rep(1, 10), rep(0, 10 * (5 - i)))
+  #non.missing.pattern[, i] <- sample(c(rep(1, 12), rep(0, 28)), 40, replace = FALSE)
+  non.missing.pattern[, i] <- sample(c(rep(1, round(40 / i)), rep(0, 40 - round(40 / i))), 40, replace = FALSE)
 }
+# for(i in (ntrt - 1):ntrt){
+#   non.missing.pattern[, i] <- sample(c(rep(1, 4), rep(0, 36)), 40, replace = FALSE)
+# }
 
 
 # alternative approach, randomize the missingness
@@ -104,7 +111,15 @@ dat.stan.lkj <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
                      s = s, r = r, totaln = totaln,
                      higher_better = 0, zeros = zeros,
                      Lambda = Lambda, 
-                     nu = nu, uni_upper = 3, eta = 1.5)
+                     nu = nu, eta = 1)
+reghorse.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
+                     s = s, r = r, totaln = totaln,
+                     higher_better = 0, zeros = zeros,
+                     scale_global_lambda = 0.1, scale_global_gamma = 1,
+                     nu_global_lambda = 1, nu_global_gamma = 1,
+                     nu_local_lambda = 1, nu_local_gamma = 1,
+                     slab_scale_lambda = 4, slab_scale_gamma = 2,
+                     slab_df_lambda = 1, slab_df_gamma = 3)
 
 jags.dat.select <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
                         s = s, r = r, totaln = totaln, 
@@ -120,15 +135,19 @@ ab.nma.select.inits <- function(){
 
 ab.nma.stan <- stan_model(here("Models", "AB-NMA.stan"))
 stan.hhc <- stan_model(here("Models", "AB-NMA-HHC.stan"))
-stan.lkj <- stan_model(here("Models", "AB-NMA-HHC-LKJ.stan"))
+stan.lkj <- stan_model(here("Models", "AB-NMA-LKJ.stan"))
+stan.reghorse <- stan_model(here("Models", "AB-NMA-regularized-horseshoe.stan"))
 
 fit.stan.IW <- sampling(ab.nma.stan, pars = c("AR", "CORR", "LOR", "MU"), data = test.dat.stan, 
                        iter = 4000, cores = 4, thin = 4)
-fit.stan.HHC <- sampling(stan.hhc, pars = c("AR", "MU"), data = dat.stan.hhc,
+fit.stan.HHC <- sampling(stan.hhc, pars = c("AR", "MU", "CORR", "SD"), data = dat.stan.hhc,
                          iter = 4000, cores = 4, thin = 4,
                          control = list(adapt_delta = 0.99, max_treedepth = 15))
-fit.stan.LKJ <- sampling(stan.lkj, pars = c("AR", "MU"), data = dat.stan.lkj,
-                         iter = 4000, cores = 4, thin = 4,
+fit.stan.LKJ <- sampling(stan.lkj, pars = c("AR", "MU", "CORR", "SD"), data = dat.stan.lkj,
+                         iter = 4000, cores = 4,
+                         control = list(adapt_delta = 0.99, max_treedepth = 15))
+fit.reghorse <- sampling(stan.reghorse, pars = c("AR", "MU", "CORR", "SD"), data = reghorse.dat,
+                         iter = 4000, cores = 4, 
                          control = list(adapt_delta = 0.99, max_treedepth = 15))
 ab.nma.params <- c("AR", "CORR", "LOR", "MU")
 
@@ -137,6 +156,27 @@ ab.select.fit <- do.call(jags.parallel,
                               inits = ab.nma.select.inits,
                               model.file = here("Models", "AB-NMA-select.txt"), DIC = FALSE,
                               n.iter = 40000, n.burnin = 10000, n.chains = 4, n.thin = 12))
+
+round(summary(fit.stan.HHC, pars = "CORR")$summary, 4)
+round(summary(fit.stan.LKJ, pars = "SD")$summary, 4)
+round(summary(fit.reghorse, pars = "SD")$summary, 4)
+
+# estimated correlation matrices
+
+matrix(round(summary(fit.stan.LKJ, pars = "CORR")$summary[,1], 4), nrow = 6, byrow = TRUE)
+matrix(round(summary(fit.reghorse, pars = "CORR")$summary[,1], 4), nrow = 6, byrow = TRUE)
+
+matrix(round(summary(fit.stan.LKJ, pars = "CORR")$summary[,3], 4) - 
+         round(summary(fit.reghorse, pars = "CORR")$summary[,3], 4), 
+       nrow = 6, byrow = TRUE)
+
+# difference in SDs of absolute risks and mean effects
+summary(fit.stan.LKJ, pars = c("AR", "MU"))$summary
+summary(fit.reghorse, pars = c("AR", "MU"))$summary
+
+round(summary(fit.stan.LKJ, pars = "AR")$summary[,3], 4) - round(summary(fit.reghorse, pars = "AR")$summary[,3], 4)
+round(summary(fit.stan.LKJ, pars = "MU")$summary[,3], 4) - round(summary(fit.reghorse, pars = "MU")$summary[,3], 4)
+
 
 
 
