@@ -1,5 +1,6 @@
-// 3RE model WITHOUT covariance selection
-// Horseshoe prior on elements of special cholesky decomposition
+// 3RE model with covariance selection
+// logit-normal analogue to spike-and-slab 
+// prior on elements of special cholesky decomposition
 
 functions{
   matrix make_Gamma(vector gamma){
@@ -33,6 +34,11 @@ data {
   real d; // prior sd of delta0
   real f; // prior mean of nu0
   real g; // prior sd of nu0
+  
+  real<lower = 0> scale_local_lambda;
+  real<lower = 0> scale_local_gamma;
+  real<lower = 0> tau_lambda;
+  real<lower = 0> tau_gamma;
 }
 
 transformed data {
@@ -47,19 +53,25 @@ parameters {
   vector[3] theta0; // mean hyperparameter vector
   vector<lower = 0>[3] lambda;  // elements of Lambda matrix in cholesky decomp
   vector[3] gamma;  // elements of gamma matrix in cholesky decomp
-  real<lower = 0> tau_lambda;  // global shrinkage parameter for lambda params
-  real<lower = 0> tau_gamma;  // global shrinkage parameter for gamma params
-  vector[3] omega_lambda;  // local shrinkage parameter for lambda params
-  vector[3] omega_gamma;   // local shrinkage parameter for gamma params
-
+  // real<lower = 0> tau_lambda;  // global shrinkage parameter for lambda params
+  // real<lower = 0> tau_gamma;  // global shrinkage parameter for gamma params
+  vector[3] omega_lambda_tilde;  // local shrinkage parameter for lambda params
+  vector[3] omega_gamma_tilde;   // local shrinkage parameter for gamma params
 }
 
 transformed parameters {
   vector<lower = 0, upper = 1>[S] pi1;
   vector<lower = 0, upper = 1>[S] pi0;
   vector<lower = 0, upper = 1>[S] psi;
+  
+  vector<lower = 0, upper = 1>[3] omega_lambda;
+  vector<lower = 0, upper = 1>[3] omega_gamma;
+  
   matrix[3, 3] Gamma;
   cov_matrix[3] Sigma;
+  
+  omega_lambda = inv_logit(omega_lambda_tilde);
+  omega_gamma = inv_logit(omega_gamma_tilde);
   
   for(i in 1:S){
     pi1[i] = inv_logit(theta[i, 1] + theta[i, 2] / 2);
@@ -84,10 +96,10 @@ model {
   theta0[2] ~ normal(c, d);
   theta0[3] ~ normal(f, g);
   
-  tau_lambda ~ cauchy(0, 1);
-  tau_gamma ~ cauchy(0, 1);
-  omega_lambda ~ cauchy(0, 1);
-  omega_gamma ~ cauchy(0, 1);
+  // tau_lambda ~ cauchy(0, 0.5);
+  // tau_gamma ~ cauchy(0, 0.5);
+  omega_lambda_tilde ~ normal(0, scale_local_lambda);
+  omega_gamma_tilde ~ normal(0, scale_local_gamma);
   
   lambda ~ normal(0, tau_lambda * omega_lambda);
   gamma ~ normal(0, tau_gamma * omega_gamma);

@@ -10,7 +10,7 @@ library(MASS)
 options(mc.cores = parallel::detectCores())
 set.seed(711)
 S <- 10
-N <- 1000
+N <- 300
 beta0 <- nu0 <- log(.15 / .85)
 delta0 <- 2
 rho.beta.delta <- -0.7
@@ -60,10 +60,15 @@ re3.dat.stan <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
 re3.dat.reghorse <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
                          a = 0, b = 2, c = 0, d = 2, f = 0, g = 2,
                          scale_global_lambda = 0.5, scale_global_gamma = 1,
-                         nu_global_lambda = 1, nu_global_gamma = 3,
+                         nu_global_lambda = 1, nu_global_gamma = 1,
                          nu_local_lambda = 1, nu_local_gamma = 1,
-                         slab_scale_lambda = 0.75, slab_df_lambda = 4,
-                         slab_scale_gamma = 0.75, slab_df_gamma = 4)
+                         slab_scale_lambda = 2, slab_df_lambda = 10,
+                         slab_scale_gamma = 2, slab_df_gamma = 4)
+
+re3.dat.lncass <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
+                       a = 0, b = 2, c = 0, d = 2, f = 0, g = 2,
+                       scale_local_lambda = 4, scale_local_gamma = 4,
+                       tau_lambda = 1, tau_gamma = 1)
 
 init.gen.3re <- function(){
   list(beta0 = runif(1, -1, 1),
@@ -88,13 +93,14 @@ re3.model <- stan_model(here("Models", "3RE.stan"))
 re3.lkj.model <- stan_model(here("Models", "3RE-LKJ.stan"))
 re3.horseshoe.model <- stan_model(here("Models", "3RE-horseshoe.stan"))
 re3.reghorseshoe.model <- stan_model(here("Models", "3RE-regularized-horseshoe.stan"))
+re3.lncass.model <- stan_model(here("Models", "3RE-LN-CASS.stan"))
 
 # fit stan models
 re3.stan <- sampling(re3.model, data = re3.dat.stan,
                      chains = 4, iter = 4000)#,
                      #control = list(adapt_delta = 0.95, max_treedepth = 15))
 re3.lkj.stan <- sampling(re3.lkj.model, data = re3.dat.stan,
-                         chains = 4, iter = 8000, warmup = 4000,
+                         chains = 4, iter = 4000, #warmup = 4000,
                          pars = c("theta0", "Sigma"),
                          control = list(adapt_delta = .99))
 re3.horseshoe.stan <- sampling(re3.horseshoe.model, data = re3.dat.stan,
@@ -103,14 +109,20 @@ re3.horseshoe.stan <- sampling(re3.horseshoe.model, data = re3.dat.stan,
                                control = list(adapt_delta = 0.99, max_treedepth = 15),
                                cores = 4)
 re3.reghorseshoe <- sampling(re3.reghorseshoe.model, data = re3.dat.reghorse,
-                             chains = 4, iter = 10000, warmup = 6000,
+                             chains = 4, iter = 4000, #warmup = 6000,
                              pars = c("theta0", "Sigma"),
                              control = list(adapt_delta = .99, max_treedepth = 15),
                              cores = 4)
+re3.lncass <- sampling(re3.lncass.model, data = re3.dat.lncass,
+                       chains = 4, iter = 4000,
+                       pars = c("theta0", "Sigma"),
+                       control = list(adapt_delta = 0.99, max_treedepth = 15),
+                       cores = 4)
 
 round(re3.jags$BUGSoutput$summary, 4)
 round(summary(re3.stan, pars = c("beta0", "delta0", "nu0", "sigma_beta", "sigma_delta", "sigma_nu"))$summary, 4)
 round(summary(re3.lkj.stan)$summary, 4)
 round(summary(re3.horseshoe.stan)$summary, 4)
 round(summary(re3.reghorseshoe)$summary, 4)
+round(summary(re3.lncass)$summary, 4)
 
