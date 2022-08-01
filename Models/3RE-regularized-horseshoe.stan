@@ -140,3 +140,17 @@ model {
   
 }
 
+generated quantities {
+  vector[3] SD;
+  matrix[3, 3] CORR;
+  
+  for(i in 1:3){
+    SD[i] = sqrt(Sigma[i, i]);
+  }
+  for(i in 1:3){
+    for(j in 1:3){
+      CORR[i, j] = Sigma[i, j] / SD[i] / SD[j];
+    }
+  }
+}
+

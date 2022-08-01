@@ -74,6 +74,11 @@ model {
 }
 
 generated quantities{
-  matrix[3, 3] corr = multiply_lower_tri_self_transpose(L);
+  vector[3] SD;
+  matrix[3, 3] CORR;
+  for(i in 1:3){
+    SD[i] = sqrt(Sigma[i, i]);
+  }
+  CORR = multiply_lower_tri_self_transpose(L);
 }
 
