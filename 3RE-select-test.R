@@ -180,7 +180,7 @@ round(summary(re3.reglambdachol)$summary, 4)
 ########## Crafting an example by hand with zero variance for each RE
 
 set.seed(803)
-S <- 7
+S <- 20
 N <- round(seq(300, 900, length.out = S))
 
 n <- round(N %*% t(c(3/20, 17/20)))
@@ -201,10 +201,10 @@ re3.dat.stan <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
                      a = 0, b = 2, c = 0, d = 2, f = 0, g = 2)
 re3.dat.reghorse <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
                          a = 0, b = 2, c = 0, d = 2, f = 0, g = 2,
-                         scale_global_lambda = 1 / sqrt(2), scale_global_gamma = 2,
+                         scale_global_lambda = 1, scale_global_gamma = 2,
                          nu_global_lambda = 1, nu_global_gamma = 3,
                          nu_local_lambda = 1, nu_local_gamma = 1,
-                         slab_scale_lambda = 4, slab_df_lambda = 1,
+                         slab_scale_lambda = 2, slab_df_lambda = 1,
                          slab_scale_gamma = 1, slab_df_gamma = 4)
 re3.dat.reglambda <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
                           a = 0, b = 2, c = 0, d = 2, f = 0, g = 2,
@@ -215,37 +215,44 @@ re3.dat.reglambda <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
 re3.stan <- sampling(re3.model, data = re3.dat.stan,
                      chains = 4, iter = 4000,
                      control = list(adapt_delta = 0.99, max_treedepth = 15))
-re3.iw <- samplign(re3.)
+# re3.iw <- samplign(re3.)
 re3.lkj.stan <- sampling(re3.lkj.model, data = re3.dat.stan,
-                         chains = 4, iter = 4000, #warmup = 4000,
+                         chains = 4, iter = 4000, # iter = 10000, warmup = 6000,
                          pars = c("theta0", "SD", "CORR"),
-                         control = list(adapt_delta = .99, max_treedepth = 15))
-re3.reghorseshoe <- sampling(re3.reghorseshoe.model, data = re3.dat.reghorse,
-                             chains = 4, iter = 4000, #warmup = 6000,
-                             pars = c("theta0", "SD", "CORR"),
-                             control = list(adapt_delta = .99, max_treedepth = 15),
-                             cores = 4)
+                         control = list(adapt_delta = .99, max_treedepth = 15),
+                         cores = 4)
+re3.horse <- sampling(re3.horseshoe.model, data = re3.dat.stan,
+                      chains = 4, iter = 4000, 
+                      control = list(adapt_delta = 0.99, max_treedepth = 15),
+                      cores = 4)
+# re3.reghorseshoe <- sampling(re3.reghorseshoe.model, data = re3.dat.reghorse,
+#                              chains = 4, iter = 4000, #warmup = 6000,
+#                              pars = c("theta0", "SD", "CORR"),
+#                              control = list(adapt_delta = .99, max_treedepth = 15),
+#                              cores = 4)
 re3.reghorsechol <- sampling(re3.reghorsechol.model, data = re3.dat.reghorse,
-                             chains = 4, iter = 4000, #warmup = 6000,
+                             chains = 4, iter = 8000, warmup = 4000,
                              pars = c("theta0", "SD", "CORR"),
-                             control = list(adapt_delta = .99, max_treedepth = 15),
+                             control = list(adapt_delta = .99, max_treedepth = 20),
                              cores = 4)
-re3.reglambdachol <- sampling(re3.reglambdachol.model, data = re3.dat.reglambda,
-                              chains = 4, iter = 4000, #warmup = 6000,
-                              pars = c("theta0", "SD", "CORR"),
-                              control = list(max_treedepth = 15),
-                              cores = 4)
+# re3.reglambdachol <- sampling(re3.reglambdachol.model, data = re3.dat.reglambda,
+#                               chains = 4, iter = 10000, warmup = 6000,
+#                               pars = c("theta0", "SD", "CORR"),
+#                               control = list(max_treedepth = 15),
+#                               cores = 4)
 
 ## function to plot posterior from 3RE
 
+lkj.samp <- as.data.frame(rstan::extract(re3.lkj.stan, pars = c("theta0", "SD", "CORR")))[, c(1:6, 8:9, 12)]
+horse.samp <- as.data.frame(rstan::extract(re3.reghorsechol, pars = c("theta0", "SD", "CORR")))[, c(1:6, 8:9, 12)]
 par(mfrow = c(3, 3))
-
-plot.post <- function(stan.obj){
-  samples <- rstan::extract(stan.obj, pars = c("theta0", "SD", "CORR"))[, c(1:6, 8:9, 12)]
-  
-  
-  
+for(i in 1:ncol(lkj.samp)){
+  hist(lkj.samp[,i], breaks = 30)
 }
+for(i in 1:ncol(horse.samp)){
+  hist(horse.samp[,i], breaks = 30)
+}
+
 
 round(summary(re3.stan, pars = c("beta0", "delta0", "nu0", "sigma_beta", "sigma_delta", "sigma_nu", "lp__"))$summary, 4)
 round(summary(re3.lkj.stan)$summary, 4)

@@ -49,8 +49,8 @@ parameters {
   vector[3] gamma;  // elements of gamma matrix in cholesky decomp
   real<lower = 0> tau_lambda;  // global shrinkage parameter for lambda params
   real<lower = 0> tau_gamma;  // global shrinkage parameter for gamma params
-  vector[3] omega_lambda;  // local shrinkage parameter for lambda params
-  vector[3] omega_gamma;   // local shrinkage parameter for gamma params
+  vector<lower = 0>[3] omega_lambda;  // local shrinkage parameter for lambda params
+  vector<lower = 0>[3] omega_gamma;   // local shrinkage parameter for gamma params
 
 }
 
@@ -59,7 +59,7 @@ transformed parameters {
   vector<lower = 0, upper = 1>[S] pi0;
   vector<lower = 0, upper = 1>[S] psi;
   matrix[3, 3] Gamma;
-  cov_matrix[3] Sigma;
+  cholesky_factor_cov[3] Sigma_chol;
   
   for(i in 1:S){
     pi1[i] = inv_logit(theta[i, 1] + theta[i, 2] / 2);
@@ -67,17 +67,10 @@ transformed parameters {
     psi[i] = inv_logit(theta[i, 3]);
   }
   Gamma = make_Gamma(gamma);
-  Sigma = multiply_lower_tri_self_transpose(diag_pre_multiply(lambda, Gamma));
+  Sigma_chol = diag_pre_multiply(lambda, Gamma);
 }
 
 model {
-  // binomial likelihood
-  y1 ~ binomial(n1, pi1);
-  y0 ~ binomial(n0, pi0);
-  n1 ~ binomial(N, psi);
-  
-  // priors
-
   
   // hyperpriors
   theta0[1] ~ normal(a, b);
@@ -93,8 +86,26 @@ model {
   gamma ~ normal(0, tau_gamma * omega_gamma);
 
   for(i in 1:S){
-    theta[i,] ~ multi_normal(theta0, Sigma);
+    theta[i,] ~ multi_normal_cholesky(theta0, Sigma_chol);
   }
+    // binomial likelihood
+  y1 ~ binomial(n1, pi1);
+  y0 ~ binomial(n0, pi0);
+  n1 ~ binomial(N, psi);
+}
+
+generated quantities {
+  vector[3] SD;
+  matrix[3, 3] CORR;
+  matrix[3, 3] Sigma = multiply_lower_tri_self_transpose(Sigma_chol);
   
+  for(i in 1:3){
+    SD[i] = sqrt(Sigma[i, i]);
+  }
+  for(i in 1:3){
+    for(j in 1:3){
+      CORR[i, j] = Sigma[i, j] / SD[i] / SD[j];
+    }
+  }
 }
 

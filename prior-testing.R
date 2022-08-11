@@ -57,10 +57,10 @@ apply(reghorse.prior.lambda.corr[,c(2, 3, 6)], 2, function(x){
 reghorse.prior.model <- stan_model(here("Models", "regularized-horseshoe-prior.stan"))
 
 reghorse.prior.dat <- list(ntrt = 3, 
-                           scale_global_gamma = 2, scale_global_lambda = 1 / 2, 
+                           scale_global_gamma = 2, scale_global_lambda = 1, 
                            nu_global_lambda = 1, nu_local_lambda = 1,
                            nu_global_gamma = 3, nu_local_gamma = 1,
-                           slab_scale_lambda = 4, slab_df_lambda = 1,
+                           slab_scale_lambda = 2, slab_df_lambda = 16,
                            slab_scale_gamma = 1, slab_df_gamma = 4)
 
 reghorse.prior.fit <- sampling(reghorse.prior.model, data = reghorse.prior.dat,
