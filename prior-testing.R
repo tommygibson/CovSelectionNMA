@@ -12,9 +12,9 @@ options(mc.cores = parallel::detectCores())
 
 reghorse.prior.lambda.model <- stan_model(here("Models", "regularized-horseshoe-prior-lambda.stan"))
 
-reghorse.prior.lambda.dat <- list(ntrt = 3, scale_gamma = 1 / sqrt(2),
-                           scale_global_lambda = 1 / sqrt(2), nu_global_lambda = 3, nu_local_lambda = 1,
-                           slab_scale_lambda = 4, slab_df_lambda = 1)
+reghorse.prior.lambda.dat <- list(ntrt = 3, scale_gamma = 6,
+                           scale_global_lambda = 0.25, nu_global_lambda = 3, nu_local_lambda = 1,
+                           slab_scale_lambda = 2, slab_df_lambda = 4)
 
 reghorse.prior.lambda.fit <- sampling(reghorse.prior.lambda.model, data = reghorse.prior.lambda.dat,
                                pars = c("SD", "CORR"), cores = 1)
@@ -29,7 +29,7 @@ names(reghorse.prior.lambda.corr) <- c("CORR.1.1", "CORR.1.2", "CORR.1.3",
 #PLOT PRIORS
 par(mfrow = c(2, 2))
 for(i in 1:3){
-  hist(reghorse.prior.lambda.sd[reghorse.prior.lambda.sd[,i] < 5, i], breaks = 40)
+  hist(reghorse.prior.lambda.sd[reghorse.prior.lambda.sd[,i] < 5, i], breaks = 30)
 }
 
 par(mfrow = c(3, 3))
@@ -57,11 +57,11 @@ apply(reghorse.prior.lambda.corr[,c(2, 3, 6)], 2, function(x){
 reghorse.prior.model <- stan_model(here("Models", "regularized-horseshoe-prior.stan"))
 
 reghorse.prior.dat <- list(ntrt = 3, 
-                           scale_global_gamma = 2, scale_global_lambda = 1, 
-                           nu_global_lambda = 1, nu_local_lambda = 1,
-                           nu_global_gamma = 3, nu_local_gamma = 1,
-                           slab_scale_lambda = 2, slab_df_lambda = 16,
-                           slab_scale_gamma = 1, slab_df_gamma = 4)
+                           scale_global_lambda = 1, scale_global_gamma = 1,
+                           nu_global_lambda = 1, nu_global_gamma = 1,
+                           nu_local_lambda = 1, nu_local_gamma = 1,
+                           slab_scale_lambda = 2, slab_df_lambda = 4,
+                           slab_scale_gamma = 1, slab_df_gamma = 8)
 
 reghorse.prior.fit <- sampling(reghorse.prior.model, data = reghorse.prior.dat,
                                       pars = c("SD", "CORR"), cores = 1)

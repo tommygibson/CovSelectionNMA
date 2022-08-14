@@ -223,6 +223,7 @@ re3.lkj.stan <- sampling(re3.lkj.model, data = re3.dat.stan,
                          cores = 4)
 re3.horse <- sampling(re3.horseshoe.model, data = re3.dat.stan,
                       chains = 4, iter = 4000, 
+                      pars = c("theta0", "SD", "CORR"),
                       control = list(adapt_delta = 0.99, max_treedepth = 15),
                       cores = 4)
 # re3.reghorseshoe <- sampling(re3.reghorseshoe.model, data = re3.dat.reghorse,
@@ -256,6 +257,6 @@ for(i in 1:ncol(horse.samp)){
 
 round(summary(re3.stan, pars = c("beta0", "delta0", "nu0", "sigma_beta", "sigma_delta", "sigma_nu", "lp__"))$summary, 4)
 round(summary(re3.lkj.stan)$summary, 4)
-round(summary(re3.reghorseshoe)$summary, 4)
+round(summary(re3.horse, pars = c("theta0", "SD", "CORR", "lp__"))$summary, 4)
 round(summary(re3.reghorsechol)$summary, 4)
 round(summary(re3.reglambdachol)$summary, 4)

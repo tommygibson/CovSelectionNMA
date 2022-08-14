@@ -1,20 +1,15 @@
 // sample from prior cov matrix with regularized horseshoe in NMA
 
 functions{
-  matrix make_Gamma(vector gamma, vector lambda, int ntrt){
+  matrix make_Gamma(vector gamma, int ntrt){
     matrix[ntrt, ntrt] Gamma;
     
   for(i in 2:ntrt){
     Gamma[i, i] = 1;
     for(j in 1:(i - 1)){
-      if(lambda[i] < 0.025 || lambda[j] < 0.025){
-        Gamma[i, j] = 0.1 * gamma[(i - 1) * (i - 2) / 2 + j];
+        Gamma[i, j] = gamma[(i - 1) * (i - 2) / 2 + j];
         Gamma[j, i] = 0;
-      } else{
-      Gamma[i, j] = gamma[(i - 1) * (i - 2) / 2 + j];
-      Gamma[j, i] = 0;
       }
-    }
   }
   Gamma[1, 1] = 1;
     
@@ -26,7 +21,7 @@ data {
   int ntrt;
   
   real<lower = 0> scale_global_lambda;  // scale for half-t on tau for lambdas
-  real<lower = 0> scale_gamma; // scale for half-t on tau for gammas
+  real<lower = 0> scale_gamma;
   
   real<lower = 1> nu_global_lambda; // df for half-t on tau for lambda
   real<lower = 1> nu_local_lambda; // df for half-t on omega for lambdas
@@ -54,9 +49,9 @@ transformed parameters {
   vector<lower = 0>[ntrt] omega_lambda_tilde; // regularized 
   
   vector<lower = 0>[ntrt] lambda;  // elements of Lambda matrix in cholesky decomp
-  vector[n_gamma] gamma;  // elements of gamma matrix in cholesky decomp
-  
-  matrix[ntrt, ntrt] Gamma;
+  matrix[ntrt, ntrt] Gamma_unscaled; // Unscaled gamma matrix
+  matrix[ntrt, ntrt] Gamma_scales;  // scaling factors for gamma matrix conditional on lambdas
+  matrix[ntrt, ntrt] Gamma;         // scaled gamma matrix
   cov_matrix[ntrt] Sigma;
   
   c_lambda = slab_scale_lambda * sqrt(c2_lambda);
@@ -64,8 +59,22 @@ transformed parameters {
   omega_lambda_tilde = sqrt(c_lambda ^ 2 * square(omega_lambda) ./ (c_lambda ^ 2 + tau_lambda ^ 2 * square(omega_lambda)));
   
   lambda = z_lambda .* omega_lambda_tilde * tau_lambda;
-  gamma = z_gamma * scale_gamma;
-  Gamma = make_Gamma(gamma, lambda, ntrt);
+  
+  for(i in 1:(ntrt - 1)){
+    Gamma_scales[i, i] = 1;
+    for(j in (i + 1):ntrt){
+      // scale for Gamma[i,j] is dependent on lambda[i] and lambda[j]
+      // if either one is small, then the scale for Gamma[i,j] is small
+      Gamma_scales[j, i] = scale_gamma * (1 / (1 / lambda[i] + 1 / lambda[j]));
+      
+      Gamma_scales[i, j] = 0;
+    }
+  }
+  
+  Gamma_scales[ntrt, ntrt] = 1;
+
+  Gamma_unscaled = make_Gamma(z_gamma, ntrt);
+  Gamma = Gamma_unscaled .* Gamma_scales;
   Sigma = multiply_lower_tri_self_transpose(diag_pre_multiply(lambda, Gamma));
   
 }

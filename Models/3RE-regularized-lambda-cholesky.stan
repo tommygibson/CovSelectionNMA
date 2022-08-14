@@ -8,19 +8,14 @@
 // regularized horseshoe priors
 
 functions{
-  matrix make_Gamma(vector gamma, vector lambda, int n_re){
+  matrix make_Gamma(vector gamma, int n_re){
     matrix[n_re, n_re] Gamma;
     
   for(i in 2:n_re){
     Gamma[i, i] = 1;
     for(j in 1:(i - 1)){
-      if(lambda[i] < 0.025 || lambda[j] < 0.025){
-        Gamma[i, j] = 0.01 * gamma[(i - 1) * (i - 2) / 2 + j];
-        Gamma[j, i] = 0;
-      } else{
-        Gamma[i, j] = gamma[(i - 1) * (i - 2) / 2 + j];
-        Gamma[j, i] = 0;
-      }
+      Gamma[i, j] = gamma[(i - 1) * (i - 2) / 2 + j];
+      Gamma[j, i] = 0;
     }
   }
   Gamma[1, 1] = 1;
@@ -43,7 +38,7 @@ data {
   real f; // prior mean of nu0
   real g; // prior sd of nu0
   real<lower = 0> scale_global_lambda;  // scale for half-t on tau for lambdas
-  real<lower = 0> scale_gamma; // scale for half-t on tau for gammas
+  real<lower = 0> scale_gamma;
   
   real<lower = 1> nu_global_lambda; // df for half-t on tau for lambda
   real<lower = 1> nu_local_lambda; // df for half-t on omega for lambdas
@@ -84,11 +79,14 @@ transformed parameters {
   real<lower = 0> c_lambda;
   
   vector<lower = 0>[n_re] omega_lambda_tilde; // regularized 
+  // vector<lower = 0>[n_re] scale_gamma; // adjust scale for gammas based on lambda
   
   vector<lower = 0>[n_re] lambda;  // elements of Lambda matrix in cholesky decomp
-  vector[n_re] gamma;  // elements of gamma matrix in cholesky decomp
+  // vector[n_re] gamma;  // elements of gamma matrix in cholesky decomp
   
-  matrix[n_re, n_re] Gamma;
+  matrix[n_re, n_re] Gamma_unscaled; // Unscaled gamma matrix
+  matrix[n_re, n_re] Gamma_scales;  // scaling factors for gamma matrix conditional on lambdas
+  matrix[n_re, n_re] Gamma;         // scaled gamma matrix
   cholesky_factor_cov[n_re] Sigma_chol;
   
   for(i in 1:S){
@@ -97,13 +95,25 @@ transformed parameters {
     psi[i] = inv_logit(theta[i, 3]);
   }
   
+  Gamma_scales[n_re, n_re] = 1;
+  
   c_lambda = slab_scale_lambda * sqrt(c2_lambda);
   
   omega_lambda_tilde = sqrt(c_lambda ^ 2 * square(omega_lambda) ./ (c_lambda ^ 2 + tau_lambda ^ 2 * square(omega_lambda)));
   
   lambda = z_lambda .* omega_lambda_tilde * tau_lambda;
-  gamma = z_gamma * scale_gamma;
-  Gamma = make_Gamma(gamma, lambda, n_re);
+  
+  for(i in 1:(n_re - 1)){
+    Gamma_scales[i, i] = 1;
+    for(j in (i + 1):n_re){
+      Gamma_scales[j, i] = scale_gamma * sqrt((1 / (1 / lambda[i]^2 + 1 / lambda[j]^2)));
+      // Gamma_scales[j, i] = (lambda[i] < 0.05 || lambda[j] < 0.05)?0.1:scale_gamma;
+      Gamma_scales[i, j] = 0;
+    }
+  }
+  // gamma = z_gamma .* scale_gamma;
+  Gamma_unscaled = make_Gamma(z_gamma, n_re);
+  Gamma = Gamma_unscaled .* Gamma_scales;
   Sigma_chol = diag_pre_multiply(lambda, Gamma);
 }
 
@@ -111,6 +121,7 @@ model {
   
   // Regularized horseshoe parameterization for elements of Lambda, Gamma
   z_lambda ~ normal(0, 1);
+  
   z_gamma ~ normal(0, 1);
   
   tau_lambda ~ student_t(nu_global_lambda, 0, scale_global_lambda);
