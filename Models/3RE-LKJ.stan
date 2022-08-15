@@ -20,8 +20,15 @@ data {
 
 transformed data {
   int N[S];
+  int y_mult[S, 4]; // multinomial cell probabiliites
   for(i in 1:S){
     N[i] = n1[i] + n0[i];
+  }
+  for(i in 1:S){
+    y_mult[i, 1] = y1[i];         // event + RF
+    y_mult[i, 2] = n1[i] - y1[i]; // no event + RF
+    y_mult[i, 3] = y0[i];          // event + no RF
+    y_mult[i, 4] = n0[i] - y0[i];  // no event + no RF
   }
 }
 
@@ -37,6 +44,7 @@ transformed parameters {
   vector<lower = 0, upper = 1>[S] pi1;
   vector<lower = 0, upper = 1>[S] pi0;
   vector<lower = 0, upper = 1>[S] psi;
+  
   cov_matrix[3] Sigma;
   
   for(i in 1:S){
@@ -48,14 +56,7 @@ transformed parameters {
 }
 
 model {
-  // binomial likelihood
-  y1 ~ binomial(n1, pi1);
-  y0 ~ binomial(n0, pi0);
-  n1 ~ binomial(N, psi);
-  
-  // priors
 
-  
   // hyperpriors
   theta0[1] ~ normal(a, b);
   theta0[2] ~ normal(c, d);
@@ -71,14 +72,32 @@ model {
     theta[i,] ~ multi_normal(theta0, Sigma);
   }
   
+    // binomial likelihood
+  y1 ~ binomial(n1, pi1);
+  y0 ~ binomial(n0, pi0);
+  n1 ~ binomial(N, psi);
+  
+  
 }
 
 generated quantities{
   vector[3] SD;
   matrix[3, 3] CORR;
+ // matrix[S, 4] pi_mult; // multinomial probabilities
+ //  vector[S] log_lik;
+  
   for(i in 1:3){
     SD[i] = sqrt(Sigma[i, i]);
   }
   CORR = multiply_lower_tri_self_transpose(L);
+  
+
+ // for(i in 1:S){
+ //   pi_mult[i, 1] = pi1[i] * psi[i];
+ //   pi_mult[i, 2] = (1 - pi1[i]) * psi[i];
+ //   pi_mult[i, 3] = pi0[i] * (1 - psi[i]);
+ //   pi_mult[i, 4] = (1 - pi0[i]) * (1 - psi[i]);
+ //   log_lik[i] = y_mult[i, 1] * log(pi_mult[i, 1]) + 
+ // }
 }
 

@@ -5,6 +5,8 @@ library(tidyverse)
 library(here)
 library(loo)
 
+source(here("CTS-functions.R"))
+
 
 # define the models
 
@@ -117,5 +119,13 @@ make_mean_var_sims <- function(sims.list){
 reglambda.sims <- make_mean_var_sims(rstan::extract(re3.reglambda, pars = c("theta0", "Sigma")))
 lkj.sims <- make_mean_var_sims(rstan::extract(re3.lkj.stan, pars = c("theta0", "Sigma")))
 cts0_from_one_posterior(reglambda.sims[1,])
-reglambda.cts0.summary <- cts_summary_from_gamma(reglambda.sims, M = 100)
-lkj.cts0.summary <- cts_summary_from_gamma(lkj.sims, M = 100)
+reglambda.cts0.summary <- as.data.frame(cts_summary_from_gamma(reglambda.sims, M = 1000)) %>%
+  type_convert() %>%
+  rename(CTS =  V1,
+         Mean = V2,
+         SD =   V3)
+lkj.cts0.summary <- as.data.frame(cts_summary_from_gamma(lkj.sims, M = 1000)) %>%
+  type_convert() %>%
+  rename(CTS = V1,
+         Mean = V2,
+         SD = V3)
