@@ -1,6 +1,11 @@
+library(MASS)
+library(tidyverse)
+library(here)
+
+
 set.seed(711)
-S <- 7
-N <- 1000
+S <- c(4, 8, 12)
+N <- 500
 beta0 <- nu0 <- log(.15 / .85)
 delta0 <- 2
 rho.beta.delta <- 0.7
@@ -13,7 +18,7 @@ sigma.nu <- 0.01
 Lambda <- diag(c(.5, .5, .01))
 Gamma <- diag(3)
 Gamma[2,1] <- 0.8
-Gamma[3,1] <- 0
+Gamma[3,1] <- 0.8
 Gamma[3,2] <- 0.8
 hyper.var <- Lambda %*% Gamma %*% t(Gamma) %*% Lambda
 cormat <- matrix(nrow = 3, ncol = 3)
@@ -28,10 +33,13 @@ hyper.mean <- c(beta0, delta0, nu0)
 #                       rho.beta.delta * sigma.beta * sigma.delta, sigma.delta ^ 2, rho.delta.nu * sigma.delta * sigma.nu,
 #                       rho.beta.nu * sigma.beta * sigma.nu, rho.delta.nu * sigma.delta * sigma.nu, sigma.nu ^ 2), 
 #                     nrow = 3, byrow = TRUE)
-cor.hat <- matrix(nrow = 1000, ncol = 3)
-for(i in 1:1000){
+cor.hat <- list()
+for(i in 1:length(S)){
+  cor.hat[[i]] <- matrix(nrow = 1000, ncol = 3)
   
-  theta <- mvrnorm(S, hyper.mean, hyper.var)
+  for(j in 1:1000){
+  
+  theta <- mvrnorm(S[i], hyper.mean, hyper.var)
   beta <- theta[,1]
   delta <- theta[,2]
   nu <- theta[,3]
@@ -54,12 +62,24 @@ for(i in 1:1000){
   y <- tabs[,c(1, 3)]
   n <- cbind(rowSums(tabs[, c(1, 2)]),
              rowSums(tabs[, c(3, 4)]))
-  bigN <- rep(N, S)
+  bigN <- rep(N, S[i])
   
   nu.hat <- log((n[,1] / bigN) / (1 - n[,1] / bigN))
   beta.hat <- apply(log((y/n) / (1 - y/n)), 1, mean)
   delta.hat <- log((tabs[,1] * tabs[,4]) / (tabs[,2] * tabs[,3]))
-  cor.hat[i,1] <- cor(beta.hat, delta.hat)
-  cor.hat[i,2] <- cor(beta.hat, nu.hat)
-  cor.hat[i,3] <- cor(delta.hat, nu.hat)
+  cor.hat[[i]][j, 1] <- cor(beta.hat, delta.hat)
+  cor.hat[[i]][j, 2] <- cor(beta.hat, nu.hat)
+  cor.hat[[i]][j, 3] <- cor(delta.hat, nu.hat)
+  }
+}
+
+par(mfrow = c(length(S), 3))
+for(i in 1:length(S)){
+  for(j in 1:3){
+    hist(cor.hat[[i]][,j], breaks = 20, xlim = c(-1, 1))
+  }
+}
+
+for(i in 1:3){
+  print(apply(cor.hat[[i]], 2, mean, na.rm=T))
 }
