@@ -1,5 +1,5 @@
 # functions to calculate CTS0's from mean and covariance posteriors
-
+library(MASS)
 
 cts0_from_one_posterior <- function(mean.var, M = 1000){
   
