@@ -36,7 +36,7 @@ syncope_re_hats <- syncope %>%
             sd.sd.beta.hat = sd.beta.hat * sqrt(1 - 2 / (n() - 1) * (gamma(n() / 2) / gamma((n() - 1) / 2))^2),
             sd.delta.hat = sd(delta.hat),
             sd.sd.delta.hat = sd.beta.hat * sqrt(1 - 2 / (n() - 1) * (gamma(n() / 2) / gamma((n() - 1) / 2))^2)) %>%
-  filter(sd.nu.hat < 0.25 | sd.beta.hat < 0.25 | sd.delta.hat < 0.25)
+  filter(sd.nu.hat < 0.2 | sd.beta.hat < 0.2 | sd.delta.hat < 0.2)
 
 syncope_small_sds <- syncope %>%
   filter(Variable %in% syncope_re_hats$Variable)
@@ -71,7 +71,9 @@ sd.sd.delta.hat <- sd.delta.hat * sqrt(1 - 2 / (S - 1) * (gamma(S / 2) / gamma((
 (corhat.2.3 <- cor(delta.hat, nu.hat))
 
 mean.sd.sd <- mean(c(sd.sd.nu.hat, sd.sd.beta.hat, sd.sd.delta.hat))
+max.sd.sd <- max(c(sd.sd.nu.hat, sd.sd.beta.hat, sd.sd.delta.hat))
 scale_global_lambda <- 2 / (3 - 2) * mean.sd.sd
+scale_global_lambda_max <- 2 / (3 - 2) * max.sd.sd
 
 re3.dat.stan <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
                      a = 0, b = 2, c = 0, d = 2, f = 0, g = 2)
@@ -84,9 +86,9 @@ re3.dat.reghorse <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
                          slab_scale_gamma = 2, slab_df_gamma = 4)
 re3.dat.reglambda <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
                          a = 0, b = 2, c = 0, d = 2, f = 0, g = 2,
-                         scale_global_lambda = scale_global_lambda, scale_gamma = 8,
+                         scale_global_lambda = scale_global_lambda_max, scale_gamma = 8,
                          nu_global_lambda = 3,  nu_local_lambda = 1,
-                         slab_scale_lambda = 1, slab_df_lambda = 1)
+                         slab_scale_lambda = 2, slab_df_lambda = 4)
 # scale_global_lambda = 1, scale_global_gamma = 1,
 # nu_global_lambda = 1, nu_global_gamma = 1,
 # nu_local_lambda = 1, nu_local_gamma = 1,
@@ -123,6 +125,40 @@ round(summary(re3.lkj.stan, pars = c("theta0", "SD", "CORR"))$summary, 4)
 # round(summary(re3.reghorse)$summary, 4)
 round(summary(re3.reglambda, pars = c("theta0", "SD", "CORR"))$summary, 4)
 
+sd.sims <- cbind.data.frame(c(as.vector(do.call(cbind, rstan::extract(re3.stan, pars = c("sigma_beta", "sigma_delta", "sigma_nu")))),
+                              as.vector(rstan::extract(re3.iw.stan, pars = "SD")$SD),
+                              as.vector(rstan::extract(re3.lkj.stan, pars = "SD")$SD),
+                              as.vector(rstan::extract(re3.reglambda, pars = "SD")$SD)),
+                            rep(rep(c("sigma_beta", "sigma_delta", "sigma_nu"), each = 8000), 4),
+                            rep(c("std", "IW", "LKJ", "RHS"), each = 24000))
+names(sd.sims) <- c("samples", "parameter", "model")
+
+# extract only unique correlation values rather than whole 3x3 matrix
+# only need rho_beta_delta, rho_beta_nu, rho_delta_nu, which are in the 2nd, 3rd, and 6th spots
+
+corr.sims <- cbind.data.frame(c(as.vector(matrix(rstan::extract(re3.iw.stan, pars = "CORR")$CORR, 8000, 9)[, c(2, 3, 6)]),
+                                as.vector(matrix(rstan::extract(re3.lkj.stan, pars = "CORR")$CORR, 8000, 9)[, c(2, 3, 6)]),
+                                as.vector(matrix(rstan::extract(re3.reglambda, pars = "CORR")$CORR, 8000, 9)[, c(2, 3, 6)])),
+                              rep(rep(c("rho_beta_delta", "rho_beta_nu", "rho_delta_nu"), each = 8000), 3),
+                              rep(c("IW", "LKJ", "RHS"), each = 24000))
+names(corr.sims) <- c("samples", "parameter", "model")
+
+sd.sims %>%
+  ggplot(aes(x = samples)) +
+  geom_histogram(bins = 40) +
+  facet_grid(parameter ~ model,
+             scales = "free") +
+  xlim(c(0, 1.5)) +
+  theme_bw()
+
+corr.sims %>%
+  ggplot(aes(x = samples)) + 
+  geom_histogram(bins = 40) + 
+  facet_grid(parameter ~ model,
+             scales = "free") +
+  xlim(c(-1, 1)) +
+  theme_bw()
+
 # plot sds and correlations
 par(mfrow = c(3, 1))
 hist(rstan::extract(re3.iw.stan, pars = "SD")$SD[,1], xlim = c(0, 2), breaks = 30)
@@ -155,6 +191,39 @@ for(i in 1:3){
   hist(rstan::extract(re3.reglambda, pars = "SD")$SD[,i], breaks = 20)
 }
 
+sd.sims <- cbind.data.frame(c(as.vector(do.call(cbind, rstan::extract(re3.stan, pars = c("sigma_beta", "sigma_delta", "sigma_nu")))),
+                              as.vector(rstan::extract(re3.iw.stan, pars = "SD")$SD),
+                              as.vector(rstan::extract(re3.lkj.stan, pars = "SD")$SD),
+                              as.vector(rstan::extract(re3.reglambda, pars = "SD")$SD)),
+                            rep(rep(c("sigma_beta", "sigma_delta", "sigma_nu"), each = 8000), 4),
+                            rep(c("std", "IW", "LKJ", "RHS"), each = 24000))
+names(sd.sims) <- c("samples", "parameter", "model")
+
+# extract only unique correlation values rather than whole 3x3 matrix
+# only need rho_beta_delta, rho_beta_nu, rho_delta_nu, which are in the 2nd, 3rd, and 6th spots
+
+corr.sims <- cbind.data.frame(c(as.vector(matrix(rstan::extract(re3.iw.stan, pars = "CORR")$CORR, 8000, 9)[, c(2, 3, 6)]),
+                                as.vector(matrix(rstan::extract(re3.lkj.stan, pars = "CORR")$CORR, 8000, 9)[, c(2, 3, 6)]),
+                                as.vector(matrix(rstan::extract(re3.reglambda, pars = "CORR")$CORR, 8000, 9)[, c(2, 3, 6)])),
+                              rep(rep(c("rho_beta_delta", "rho_beta_nu", "rho_delta_nu"), each = 8000), 3),
+                              rep(c("IW", "LKJ", "RHS"), each = 24000))
+names(corr.sims) <- c("samples", "parameter", "model")
+
+sd.sims %>%
+  ggplot(aes(x = samples)) +
+  geom_histogram(bins = 40) +
+  facet_grid(parameter ~ model,
+             scales = "free") +
+  xlim(c(0, 1.5)) +
+  theme_bw()
+
+corr.sims %>%
+  ggplot(aes(x = samples)) + 
+  geom_histogram(bins = 40) + 
+  facet_grid(parameter ~ model,
+             scales = "free") +
+  xlim(c(-1, 1)) +
+  theme_bw()
 # reglambda.sims <- rstan::extract(re3.reglambda, pars = c("theta0", "Sigma"))
 make_mean_var_sims <- function(sims.list){
   theta <- sims.list$theta0

@@ -13,7 +13,7 @@ re3.reglambda.model <- stan_model(here("Models", "3RE-regularized-lambda-cholesk
 # either 3, 5, or 7 studies (to mimic syncope data)
 # S <- c(3, 5, 7)
 set.seed(1234)
-S <- 3
+S <- 5
 
 # keep prob of event for \RFbar group constant at 0.05
 pi0 <- 0.05
@@ -23,7 +23,7 @@ pi0 <- 0.05
 # for(i in 1:length(S)){
 #   pi1[[i]] <- seq(0.075, 0.2, length.out = S[i])
 # }
-pi1 <- seq(0.075, 0.2, length.out = S)
+pi1 <- seq(0.075, 0.3, length.out = S)
 
 # prob of \RF is constant at 0.25
 psi <- 0.25
@@ -73,7 +73,7 @@ re3.dat.stan <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
 
 re3.dat.reglambda <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
                           a = 0, b = 2, c = 0, d = 2, f = 0, g = 2,
-                          scale_global_lambda = scale_global_lambda, scale_gamma = 4,
+                          scale_global_lambda = scale_global_lambda, scale_gamma = 2,
                           nu_global_lambda = 3,  nu_local_lambda = 1,
                           slab_scale_lambda = 1, slab_df_lambda = 4)
 
