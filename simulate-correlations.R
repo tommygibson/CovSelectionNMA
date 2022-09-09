@@ -4,8 +4,9 @@ library(here)
 
 
 set.seed(711)
-S <- c(4, 8, 12)
-N <- 500
+S <- c(3, 5, 7)
+N <- 1000
+nsim <- 1000
 beta0 <- nu0 <- log(.15 / .85)
 delta0 <- 2
 rho.beta.delta <- 0.7
@@ -15,7 +16,7 @@ sigma.beta <- 0.5
 sigma.delta <- 1
 sigma.nu <- 0.01
 
-Lambda <- diag(c(.5, .5, .01))
+Lambda <- diag(c(.8, .2, .025))
 Gamma <- diag(3)
 Gamma[2,1] <- 0.8
 Gamma[3,1] <- 0.8
@@ -33,11 +34,13 @@ hyper.mean <- c(beta0, delta0, nu0)
 #                       rho.beta.delta * sigma.beta * sigma.delta, sigma.delta ^ 2, rho.delta.nu * sigma.delta * sigma.nu,
 #                       rho.beta.nu * sigma.beta * sigma.nu, rho.delta.nu * sigma.delta * sigma.nu, sigma.nu ^ 2), 
 #                     nrow = 3, byrow = TRUE)
+sd.hat <- list()
 cor.hat <- list()
 for(i in 1:length(S)){
-  cor.hat[[i]] <- matrix(nrow = 1000, ncol = 3)
+  sd.hat[[i]] <- matrix(nrow = nsim, ncol = 3)
+  cor.hat[[i]] <- matrix(nrow = nsim, ncol = 3)
   
-  for(j in 1:1000){
+  for(j in 1:nsim){
   
   theta <- mvrnorm(S[i], hyper.mean, hyper.var)
   beta <- theta[,1]
@@ -65,8 +68,11 @@ for(i in 1:length(S)){
   bigN <- rep(N, S[i])
   
   nu.hat <- log((n[,1] / bigN) / (1 - n[,1] / bigN))
-  beta.hat <- apply(log((y/n) / (1 - y/n)), 1, mean)
-  delta.hat <- log((tabs[,1] * tabs[,4]) / (tabs[,2] * tabs[,3]))
+  beta.hat <- apply(log(((y + 0.5)/(n + 1)) / (1 - (y + 0.5) / (n + 1))), 1, mean)
+  delta.hat <- log(((tabs[,1] + 0.5) * (tabs[,4] + 0.5)) / ((tabs[,2] + 0.5) * (tabs[,3] + 0.5)))
+  sd.hat[[i]][j, 1] <- sd(beta.hat)
+  sd.hat[[i]][j, 2] <- sd(delta.hat)
+  sd.hat[[i]][j, 3] <- sd(nu.hat)
   cor.hat[[i]][j, 1] <- cor(beta.hat, delta.hat)
   cor.hat[[i]][j, 2] <- cor(beta.hat, nu.hat)
   cor.hat[[i]][j, 3] <- cor(delta.hat, nu.hat)
@@ -79,7 +85,16 @@ for(i in 1:length(S)){
     hist(cor.hat[[i]][,j], breaks = 20, xlim = c(-1, 1))
   }
 }
+for(i in 1:length(S)){
+  for(j in 1:3){
+    hist(sd.hat[[i]][,j], breaks = 20, xlim = c(0, quantile(sd.hat[[i]][,j], 0.975)))
+  }
+}
+
 
 for(i in 1:3){
   print(apply(cor.hat[[i]], 2, mean, na.rm=T))
+}
+for(i in 1:3){
+  print(apply(sd.hat[[i]], 2, mean, na.rm = T))
 }
