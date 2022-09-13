@@ -16,6 +16,8 @@ data {
   real d; // prior sd of delta0
   real f; // prior mean of nu0
   real g; // prior sd of nu0
+  
+  real nu; // parameter for lkj prior
 }
 
 transformed data {
@@ -66,7 +68,7 @@ model {
     sds[i] ~ cauchy(0, 0.75);
   }
   
-  L ~ lkj_corr_cholesky(1);
+  L ~ lkj_corr_cholesky(nu);
   
   for(i in 1:S){
     theta[i,] ~ multi_normal(theta0, Sigma);
