@@ -16,7 +16,7 @@ re3.reglambda.model <- stan_model(here("Models", "3RE-regularized-lambda-cholesk
 
 # either 3, 5, or 7 studies (to mimic syncope data)
 # S <- c(3, 5, 7)
-set.seed(1234)
+set.seed(123)
 S <- 5
 
 # keep prob of event for \RFbar group constant at 0.05
@@ -27,7 +27,7 @@ pi0 <- 0.05
 # for(i in 1:length(S)){
 #   pi1[[i]] <- seq(0.075, 0.2, length.out = S[i])
 # }
-pi1 <- seq(0.075, 0.3, length.out = S)
+pi1 <- seq(0.075, 0.30, length.out = S)
 
 # prob of \RF is constant at 0.25
 psi <- 0.25
@@ -35,7 +35,7 @@ psi <- 0.25
 # number of subjects per study will be uniform(250, 2500) as in 3RE paper
 
 
-N <- sample(floor(seq(500, 2500, length.out = 7)), S, replace = FALSE)
+N <- sample(floor(seq(500, 2500, length.out = 5)), S, replace = FALSE)
 pi11 <- pi1 * psi
 pi10 <- (1 - pi1) * psi
 pi01 <- pi0 * (1 - psi)
@@ -80,7 +80,7 @@ re3.dat.lkj <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
 
 re3.dat.reglambda <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
                           a = 0, b = 2, c = 0, d = 2, f = 0, g = 2,
-                          scale_global_lambda = scale_global_lambda, scale_gamma = 2,
+                          scale_global_lambda = scale_global_lambda, scale_gamma = 3,
                           nu_global_lambda = 3,  nu_local_lambda = 1,
                           slab_scale_lambda = 1, slab_df_lambda = 4)
 
@@ -94,14 +94,14 @@ re3.iw.stan <- sampling(re3.iw.model, data = re3.dat.stan,
                         seed = 715)
 
 re3.lkj.stan <- sampling(re3.lkj.model, data = re3.dat.lkj,
-                         chains = 4, iter = 6000, warmup = 4000,
+                         chains = 4, iter = 5000, warmup = 3000,
                          pars = c("theta0", "SD", "CORR", "Sigma"),
                          control = list(adapt_delta = .99, max_treedepth = 15),
                          cores = 4,
                          seed = 716)
 
 re3.reglambda <- sampling(re3.reglambda.model, data = re3.dat.reglambda,
-                          chains = 4, iter = 6000, warmup = 4000,
+                          chains = 4, iter = 8000, warmup = 6000,
                           pars = c("theta0", "SD", "CORR", "Sigma"),
                           control = list(adapt_delta = 0.99, max_treedepth = 15),
                           cores = 4,
@@ -113,31 +113,31 @@ round(summary(re3.lkj.stan, pars = c("theta0", "SD", "CORR", "lp__"))$summary, 4
 round(summary(re3.reglambda, pars = c("theta0", "SD", "CORR", "lp__"))$summary, 4)
 
 
-par(mfrow = c(3, 3))
-for(i in 1:3){
-  for(j in 1:3){
-    hist(rstan::extract(re3.iw.stan, pars = "CORR")$CORR[,i,j], xlim = c(-1, 1), breaks = 30)
-  }
-}
-for(i in 1:3){
-  for(j in 1:3){
-    hist(rstan::extract(re3.lkj.stan, pars = "CORR")$CORR[,i,j], xlim = c(-1, 1), breaks = 30)
-  }
-}
-for(i in 1:3){
-  for(j in 1:3){
-    hist(rstan::extract(re3.reglambda, pars = "CORR")$CORR[,i,j], xlim = c(-1, 1), breaks = 30)
-  }
-}
+# par(mfrow = c(3, 3))
+# for(i in 1:3){
+#   for(j in 1:3){
+#     hist(rstan::extract(re3.iw.stan, pars = "CORR")$CORR[,i,j], xlim = c(-1, 1), breaks = 30)
+#   }
+# }
+# for(i in 1:3){
+#   for(j in 1:3){
+#     hist(rstan::extract(re3.lkj.stan, pars = "CORR")$CORR[,i,j], xlim = c(-1, 1), breaks = 30)
+#   }
+# }
+# for(i in 1:3){
+#   for(j in 1:3){
+#     hist(rstan::extract(re3.reglambda, pars = "CORR")$CORR[,i,j], xlim = c(-1, 1), breaks = 30)
+#   }
+# }
 
-sd.lim.max <- c(2, 2, 0.75)
+#sd.lim.max <- c(2, 2, 0.75)
 
-sd.sims <- cbind.data.frame(c(as.vector(do.call(cbind, rstan::extract(re3.stan, pars = c("sigma_beta", "sigma_delta", "sigma_nu")))),
+sd.sims <- cbind.data.frame(c(#as.vector(do.call(cbind, rstan::extract(re3.stan, pars = c("sigma_beta", "sigma_delta", "sigma_nu")))),
                               as.vector(rstan::extract(re3.iw.stan, pars = "SD")$SD),
                               as.vector(rstan::extract(re3.lkj.stan, pars = "SD")$SD),
                               as.vector(rstan::extract(re3.reglambda, pars = "SD")$SD)),
-                            rep(rep(c("sigma_beta", "sigma_delta", "sigma_nu"), each = 8000), 4),
-                            rep(c("std", "IW", "LKJ", "RHS"), each = 24000))
+                            rep(rep(c("sigma[beta]", "sigma[delta]", "sigma[nu]"), each = 8000), 3),
+                            rep(c("IW", "LKJ", "RHS-CS"), each = 24000))
 names(sd.sims) <- c("samples", "parameter", "model")
 
 # extract only unique correlation values rather than whole 3x3 matrix
@@ -146,23 +146,22 @@ names(sd.sims) <- c("samples", "parameter", "model")
 corr.sims <- cbind.data.frame(c(as.vector(matrix(rstan::extract(re3.iw.stan, pars = "CORR")$CORR, 8000, 9)[, c(2, 3, 6)]),
                                 as.vector(matrix(rstan::extract(re3.lkj.stan, pars = "CORR")$CORR, 8000, 9)[, c(2, 3, 6)]),
                                 as.vector(matrix(rstan::extract(re3.reglambda, pars = "CORR")$CORR, 8000, 9)[, c(2, 3, 6)])),
-                              rep(rep(c("rho_beta_delta", "rho_beta_nu", "rho_delta_nu"), each = 8000), 3),
-                              rep(c("IW", "LKJ", "RHS"), each = 24000))
+                              rep(rep(c("rho[beta][delta]", "rho[beta][nu]", "rho[delta][nu]"), each = 8000), 3),
+                              rep(c("IW", "LKJ", "RHS-CS"), each = 24000))
 names(corr.sims) <- c("samples", "parameter", "model")
 
-corr.sims$parameter <- factor(corr.sims$parameter,
-                              levels = c("rho_beta_delta", "rho_beta_nu", "rho_delta_nu"),
-                              labels = c("rho[beta][delta]", "rho[beta][nu]", "rho[delta][nu]"))
 
 sd.means <- sd.sims %>%
   ungroup() %>%
   group_by(parameter, model) %>%
   summarize(mean = round(mean(samples), 3),
-            sd = round(sd(samples), 3),
-            x.mean = 0.1,
-            y.mean = max(ifelse(str_detect(parameter, "nu"), 3725, 975)),
-            x.sd = 0.1,
-            y.sd = max(ifelse(str_detect(parameter, "nu"), 3250, 850)))
+            median = round(median(samples), 3),
+            x.mean = 1,
+            y.mean = max(ifelse(str_detect(parameter, "beta"), 1200, 
+                                ifelse(str_detect(parameter, "delta"), 550, 3250))),
+            x.median = 1,
+            y.median = max(ifelse(str_detect(parameter, "beta"), 1050, 
+                                  ifelse(str_detect(parameter, "delta"), 475, 2900))))
 
 corr.means <- corr.sims %>%
   ungroup() %>%
@@ -170,20 +169,28 @@ corr.means <- corr.sims %>%
   summarize(mean = round(mean(samples), 3),
             sd = round(sd(samples), 3),
             x.mean = -1.01,
-            y.mean = max(ifelse(str_detect(parameter, "nu"), 3725, 975)),
+            y.mean = max(ifelse(str_detect(parameter, "nu"), 3725, 950)),
             x.sd = -1.01,
-            y.sd = max(ifelse(str_detect(parameter, "nu"), 3250, 850)))
+            y.sd = max(ifelse(str_detect(parameter, "nu"), 3250, 825)))
 
 
 sd.sims %>%
   ggplot(aes(x = samples)) +
   geom_histogram(bins = 40) +
   facet_grid(parameter ~ model,
-             scales = "free") +
-  xlim(c(0, 1)) +
-  theme_bw()
+             scales = "free",
+             labeller = label_parsed) +
+  xlim(c(0, 1.75)) +
+  theme_bw() +
+  geom_text(data = sd.means, aes(x = x.mean, y = y.mean, label = paste0("Mean = ", mean)),
+            size = 6 * .36, family = "LM Roman 10",
+            hjust = 0) +
+  geom_text(data = sd.means, aes(x = x.median, y = y.median, label = paste0("Med. = ", median)),
+            size = 6 * .36, family = "LM Roman 10",
+            hjust = 0)
 
-corr.plot <- corr.sims %>%
+corr.plot <-
+  corr.sims %>%
   ggplot(aes(x = samples)) + 
   geom_histogram(bins = 40) + 
   facet_grid(parameter ~ model,
@@ -202,9 +209,9 @@ corr.plot <- corr.sims %>%
             size = 6 * .36, family = "LM Roman 10",
             hjust = 0)
 
-ggsave(here("Figures", "corr_plot.pdf"), corr.plot,
-       width = 5, height = 5, units = "in", device = "pdf",
-       dpi = 300)
+# ggsave(here("Figures", "3re-synthetic-corr-plot.pdf"), corr.plot,
+#        width = 5, height = 5, units = "in", device = "pdf",
+#        dpi = 300)
 
 reglambda.sims <- make_mean_var_sims(rstan::extract(re3.reglambda, pars = c("theta0", "Sigma")))
 lkj.sims <- make_mean_var_sims(rstan::extract(re3.lkj.stan, pars = c("theta0", "Sigma")))
@@ -242,8 +249,8 @@ iw.cts0 <- iw.cts0.summary %>%
                               " (", round(`2.5%`, 2), 
                               ", ", round(`97.5%`, 2), ")", sep = ""))
 all.cts0 <- cbind.data.frame(iw.cts0, lkj.cts0$Posterior, reglambda.cts0$Posterior)
-names(all.cts0) <- c("CTS", "IW", "LKJ", "RHS")
-
+names(all.cts0) <- c("CTS", "IW", "LKJ", "RHS-CS")
+# 
 # print(xtable(all.cts0, caption = "Synthetic 3RE CTS0 summary", type = "latex", digits = 2),
 #       file = here("Results", "3re-synthetic-cts.tex"), include.rownames = FALSE)
 
