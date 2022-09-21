@@ -137,7 +137,7 @@ generated quantities {
   real log_likelihood [len];
   real likelihood [len];
   for(j in 1:ntrt){
-    AR[j] = inv_logit(mu[j]/ sqrt(1 + Sigma [j,j] * 256 / 75 / pi() / pi()));
+    AR[j] = inv_logit(mu[j]/ sqrt(1 + (sigma_beta ^ 2 + Sigma [j,j]) * 256 / 75 / pi() / pi()));
     SD[j] = sqrt(Sigma[j,j]);
     MU[j] = mu[j];
   }
