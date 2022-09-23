@@ -20,16 +20,20 @@ nma.reglambda.sepvar.freegamma <- stan_model(here("Models", "AB-NMA-sepvar-hier-
 ########
 
 set.seed(714) # like babe ruth
-nma.dat.1 <- read_csv(here("Data", "dat.dong2013.csv")) %>%
-  group_by(treatment) %>%
-  filter(n() > 2) %>%
-  ungroup() %>% group_by(id) %>%
-  filter(n() > 1)
+nma.dat.1 <- read_csv(here("Data", "dat.dong2013.csv")) # %>%
+  # group_by(treatment) %>%
+  # filter(n() > 2) %>%
+  # ungroup() %>% group_by(id) %>%
+  # filter(n() > 1)
 
 len <- dim(nma.dat.1)[1]
 ntrt <- length(unique(nma.dat.1$treatment))
 nstudy <- max(nma.dat.1$id)
-t <- as.numeric(as.factor(nma.dat.1$treatment))
+
+nma.dat.1$treatment <- factor(nma.dat.1$treatment,
+                              levels = names(table(nma.dat.1$treatment))[order(table(nma.dat.1$treatment))])
+
+t <- as.numeric(nma.dat.1$treatment)
 s <- nma.dat.1$id
 r <- nma.dat.1$death
 totaln <- nma.dat.1$randomized
@@ -81,12 +85,12 @@ reglambda.sepvar.freegamma.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, 
 #                                    control = list(adapt_delta = 0.99, max_treedepth = 15),
 #                                    seed = 923)
 
-fit.1.sepvar.freegamma <- sampling(nma.reglambda.sepvar.freegamma,
+RHS_SV <- sampling(nma.reglambda.sepvar.freegamma,
                                    pars = c("SD", "sigma_beta", "CORR",
                                             "MU", "AR", "LOR", "log_likelihood"),
                                    data = reglambda.sepvar.freegamma.dat,
-                                   iter = 6000, warmup = 2000, thin = 2, cores = 4,
-                                   #iter = 200, warmup = 100, cores = 4,
+                                   iter = 6000, warmup = 2000, thin = 1, cores = 4,
+                                   #iter = 100, warmup = 50, cores = 4,
                                    control = list(adapt_delta = 0.99, max_treedepth = 15),
                                    seed = 924)
 
@@ -106,19 +110,19 @@ fit.1.sepvar.freegamma <- sampling(nma.reglambda.sepvar.freegamma,
 # round(summary(fit.1.sepvar.hier, pars = c("MU", "AR", "lp__"))$summary, 4)
 # round(summary(fit.1.sepvar.freegamma, pars = c("MU", "AR", "lp__"))$summary, 4)
 
-log_lik <- list()
+log_lik <-  extract_log_lik(RHS_SV, parameter_name = "log_likelihood")
 
-log_lik[[1]] <- extract_log_lik(fit.1.sepvar.freegamma, parameter_name = "log_likelihood")
+r_eff <- relative_eff(exp(log_lik), chain_id = rep(1:4, each = 4000))
+# r_eff <- lapply(log_lik, function(x){
+#   relative_eff(exp(x), chain_id = rep(1:4, each = 3000)) # 4 chains, each with 3000 draws
+# })
 
-r_eff <- lapply(log_lik, function(x){
-  relative_eff(exp(x), chain_id = rep(1:4, each = 2000)) # 4 chains, each with 3000 draws
-})
+loo_1 <- loo(log_lik, r_eff = r_eff)
+# loo_list <- lapply(1:length(log_lik), function(j){
+#   loo::loo(log_lik[[j]], r_eff = r_eff[[j]])
+# })
 
-loo_list <- lapply(1:length(log_lik), function(j){
-  loo::loo(log_lik[[j]], r_eff = r_eff[[j]])
-})
 
-models <- list(fit.1.sepvar.freegamma)
-names(models) <- names(loo_list) <- c("sepvar.freegamma")
+#names(models) <- names(loo_list) <- c("sepvar.freegamma")
 
-write_rds(list(models, loo_list), file = here("Results", "dong-models6.rds"))
+write_rds(list(RHS_SV, loo_1), file = here("Results", "dong-models6-allarms.rds"))
