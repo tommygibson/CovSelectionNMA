@@ -4,10 +4,11 @@ library(here)
 
 
 set.seed(711)
-S <- c(3, 5, 7)
+S <- c(4, 6)#c(3, 5, 7)
 N <- 1000
-nsim <- 1000
-beta0 <- nu0 <- log(.15 / .85)
+nsim <- 2000
+beta0 <- log(.15 / .85)
+nu0 <- -1
 delta0 <- 2
 rho.beta.delta <- 0.7
 rho.beta.nu <- 0
@@ -16,7 +17,7 @@ sigma.beta <- 0.5
 sigma.delta <- 1
 sigma.nu <- 0.01
 
-Lambda <- diag(c(.8, .2, .025))
+Lambda <- diag(c(.25, .6, .01))
 Gamma <- diag(3)
 Gamma[2,1] <- 0.8
 Gamma[3,1] <- 0.8
