@@ -93,7 +93,7 @@ lkj.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
                      Lambda = Lambda, 
                      nu = nu, eta = 1)
 
-reglambda.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
+RHS.CS.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
                       s = s, r = r, totaln = totaln,
                       higher_better = 0, zeros = zeros,
                       scale_gamma = sqrt(2),
@@ -105,13 +105,13 @@ RHS.NS.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
                       scale_gamma = 1,
                       scale_global_lambda = tau0, nu_global_lambda = 3, nu_local_lambda = 1,
                       slab_scale_lambda = 2, slab_df_lambda = 4)
-reglambda.sepvar.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
+RHS.CS.SV.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
                              s = s, r = r, totaln = totaln,
                              higher_better = 0, zeros = zeros,
                              scale_gamma = 4,
                              scale_global_lambda = tau0_sepvar, nu_global_lambda = 3, nu_local_lambda = 1,
                              slab_scale_lambda = 2, slab_df_lambda = 4)
-reglambda.sepvar.freegamma.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
+RHS.NS.SV.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
                                       s = s, r = r, totaln = totaln,
                                       higher_better = 0, zeros = zeros,
                                       scale_gamma = 1,
@@ -168,59 +168,59 @@ reglambda.sepvar.freegamma.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, 
 
 iw.ordered <- sampling(nma.std, pars = c("SD", "CORR", "MU", "AR",
                                          "LOR", "log_likelihood"), 
-                       data = std.dat, iter = 6000, warmup = 2000, thin = 1, cores = 4,
+                       data = std.dat, iter = 6000, warmup = 2000, thin = 2, cores = 4,
                        #data = std.dat, iter = 400, warmup = 200, cores = 4,
                        control = list(adapt_delta = 0.99),
                        seed = 919)
 
 lkj.ordered <- sampling(nma.lkj, pars = c("SD", "CORR", "MU", "AR",
                                           "LOR", "log_likelihood"), 
-                        data = lkj.dat, iter = 6000, warmup = 2000, thin = 1, cores = 4,
+                        data = lkj.dat, iter = 6000, warmup = 2000, thin = 2, cores = 4,
                         #data = lkj.dat, iter = 400, warmup = 200, cores = 4,
                         control = list(adapt_delta = 0.99, max_treedepth = 15),
-                        seed = 920)
+                        seed = 919)
 
-RHS.ordered <- sampling(nma.reglambda, 
+RHS.CS.ordered <- sampling(nma.reglambda, 
                         pars = c("SD", "CORR", "MU", "AR",
                                  "LOR", "log_likelihood"), 
-                        data = reglambda.dat, iter = 6000, warmup = 2000, thin = 1, cores = 4,
+                        data = RHS.CS.dat, iter = 6000, warmup = 2000, thin = 2, cores = 4,
                         #data = reglambda.dat, iter = 400, warmup = 200, cores = 4,
                         control = list(adapt_delta = 0.99, max_treedepth = 15),
-                        seed = 921)
+                        seed = 919)
 RHS.NS.ordered <- sampling(nma.RHS.NS, 
                            pars = c("SD", "CORR", "MU", "AR",
                                     "LOR", "log_likelihood"), 
-                           data = RHS.NS.dat, iter = 6000, warmup = 2000, thin = 1, cores = 4,
+                           data = RHS.NS.dat, iter = 6000, warmup = 2000, thin = 2, cores = 4,
                            #data = RHS.NS.dat, iter = 400, warmup = 200, cores = 4,
                            control = list(adapt_delta = 0.99, max_treedepth = 15),
-                           seed = 922)
-RHS.SV.ordered <- sampling(nma.reglambda.sepvar,
+                           seed = 919)
+RHS.CS.SV.ordered <- sampling(nma.reglambda.sepvar,
                            pars = c("SD", "sigma_beta", "CORR",
                                     "MU", "AR", "LOR", "log_likelihood"),
-                           data = reglambda.dat, 
-                           iter = 6000, warmup = 2000, thin = 1, cores = 4,
+                           data = RHS.CS.SV.dat, 
+                           iter = 6000, warmup = 2000, thin = 2, cores = 4,
                            #iter = 400, warmup = 200, cores = 4,
                            control = list(adapt_delta = 0.99, max_treedepth = 15),
-                           seed = 923)
+                           seed = 919)
 
 
 round(summary(iw.ordered, pars =      c("SD", "CORR", "lp__"))$summary, 4)
 round(summary(lkj.ordered, pars =       c("SD", "CORR", "lp__"))$summary, 4)
-round(summary(RHS.ordered, pars =     c("SD", "CORR", "lp__"))$summary, 4)
+round(summary(RHS.CS.ordered, pars =     c("SD", "CORR", "lp__"))$summary, 4)
 round(summary(RHS.NS.ordered, pars =  c("SD", "CORR", "lp__"))$summary, 4)
-round(summary(RHS.SV.ordered, pars =  c("SD", "sigma_beta", "CORR", "lp__"))$summary, 4)
+round(summary(RHS.CS.SV.ordered, pars =  c("SD", "sigma_beta", "CORR", "lp__"))$summary, 4)
 round(summary(iw.ordered, pars =      c("MU", "AR", "lp__"))$summary, 4)
 round(summary(lkj.ordered, pars =       c("MU", "AR", "lp__"))$summary, 4)
-round(summary(RHS.ordered, pars =     c("MU", "AR", "lp__"))$summary, 4)
+round(summary(RHS.CS.ordered, pars =     c("MU", "AR", "lp__"))$summary, 4)
 round(summary(RHS.NS.ordered, pars =  c("MU", "AR", "lp__"))$summary, 4)
-round(summary(RHS.SV.ordered, pars =  c("MU", "AR", "lp__"))$summary, 4)
+round(summary(RHS.CS.SV.ordered, pars =  c("MU", "AR", "lp__"))$summary, 4)
 
 log_lik <- list()
 log_lik[[1]] <- extract_log_lik(iw.ordered, parameter_name = "log_likelihood")
 log_lik[[2]] <- extract_log_lik(lkj.ordered, parameter_name = "log_likelihood")
-log_lik[[3]] <- extract_log_lik(RHS.ordered, parameter_name = "log_likelihood")
+log_lik[[3]] <- extract_log_lik(RHS.CS.ordered, parameter_name = "log_likelihood")
 log_lik[[4]] <- extract_log_lik(RHS.NS.ordered, parameter_name = "log_likelihood")
-log_lik[[5]] <- extract_log_lik(RHS.SV.ordered, parameter_name = "log_likelihood")
+log_lik[[5]] <- extract_log_lik(RHS.CS.SV.ordered, parameter_name = "log_likelihood")
 #log_lik[[5]] <- extract_log_lik(fit.1.sepvar.freegamma, parameter_name = "log_likelihood")
 
 r_eff <- lapply(log_lik, function(x){
