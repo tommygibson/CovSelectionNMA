@@ -204,16 +204,16 @@ RHS.CS.SV.ordered <- sampling(nma.reglambda.sepvar,
                            seed = 919)
 
 
-round(summary(iw.ordered, pars =      c("SD", "CORR", "lp__"))$summary, 4)
-round(summary(lkj.ordered, pars =       c("SD", "CORR", "lp__"))$summary, 4)
-round(summary(RHS.CS.ordered, pars =     c("SD", "CORR", "lp__"))$summary, 4)
-round(summary(RHS.NS.ordered, pars =  c("SD", "CORR", "lp__"))$summary, 4)
-round(summary(RHS.CS.SV.ordered, pars =  c("SD", "sigma_beta", "CORR", "lp__"))$summary, 4)
-round(summary(iw.ordered, pars =      c("MU", "AR", "lp__"))$summary, 4)
-round(summary(lkj.ordered, pars =       c("MU", "AR", "lp__"))$summary, 4)
-round(summary(RHS.CS.ordered, pars =     c("MU", "AR", "lp__"))$summary, 4)
-round(summary(RHS.NS.ordered, pars =  c("MU", "AR", "lp__"))$summary, 4)
-round(summary(RHS.CS.SV.ordered, pars =  c("MU", "AR", "lp__"))$summary, 4)
+# round(summary(iw.ordered, pars =      c("SD", "CORR", "lp__"))$summary, 4)
+# round(summary(lkj.ordered, pars =       c("SD", "CORR", "lp__"))$summary, 4)
+# round(summary(RHS.CS.ordered, pars =     c("SD", "CORR", "lp__"))$summary, 4)
+# round(summary(RHS.NS.ordered, pars =  c("SD", "CORR", "lp__"))$summary, 4)
+# round(summary(RHS.CS.SV.ordered, pars =  c("SD", "sigma_beta", "CORR", "lp__"))$summary, 4)
+# round(summary(iw.ordered, pars =      c("MU", "AR", "lp__"))$summary, 4)
+# round(summary(lkj.ordered, pars =       c("MU", "AR", "lp__"))$summary, 4)
+# round(summary(RHS.CS.ordered, pars =     c("MU", "AR", "lp__"))$summary, 4)
+# round(summary(RHS.NS.ordered, pars =  c("MU", "AR", "lp__"))$summary, 4)
+# round(summary(RHS.CS.SV.ordered, pars =  c("MU", "AR", "lp__"))$summary, 4)
 
 log_lik <- list()
 log_lik[[1]] <- extract_log_lik(iw.ordered, parameter_name = "log_likelihood")
@@ -224,15 +224,15 @@ log_lik[[5]] <- extract_log_lik(RHS.CS.SV.ordered, parameter_name = "log_likelih
 #log_lik[[5]] <- extract_log_lik(fit.1.sepvar.freegamma, parameter_name = "log_likelihood")
 
 r_eff <- lapply(log_lik, function(x){
-  relative_eff(exp(x), chain_id = rep(1:4, each = 4000)) # 4 chains, each with 3000 draws
+  relative_eff(exp(x), chain_id = rep(1:4, each = 2000)) # 4 chains, each with 3000 draws
 })
 
 loo_list <- lapply(1:length(log_lik), function(j){
   loo::loo(log_lik[[j]], r_eff = r_eff[[j]])
 })
 
-models <- list(fit.1.stan, fit.1.lkj, fit.1.reglambda, fit.1.RHS.NS, fit.1.reglambda.sepvar) # fit.1.sepvar.freegamma)
+models <- list(iw.ordered, lkj.ordered, RHS.CS.ordered, RHS.NS.ordered, RHS.CS.SV.ordered) # fit.1.sepvar.freegamma)
 
 names(models) <- names(loo_list) <- c("IW", "LKJ", "RHS-CS", "RHS-NS", "RHS-CS-SV")
 
-write_rds(list(models, loo_list), file = here("Results", "dong-models1-5-allarms.rds"))
+write_rds(list(models, loo_list), file = here("Results", "dong-models1-5-allarms-ordered.rds"))

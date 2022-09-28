@@ -23,21 +23,17 @@ nma.dat.1$treatment <- factor(nma.dat.1$treatment,
 
 # Results from Dong 2013 analysis wihtout treatment arm w/ only 2 observations 
 
-dong_models_5arms <- read_rds(here("Results", "dong-models1-5.rds"))[[1]]
-dong_loos_5arms <- read_rds(here("Results", "dong-models1-5.rds"))[[2]]
-
-dong_models_6arms <- read_rds(here("Results", "dong-models1-5-allarms.rds"))[[1]]
-dong_loos_6arms <- read_rds(here("Results", "dong-models1-5-allarms.rds"))[[2]]
+dong_models_6arms <- read_rds(here("Results", "dong-models1-5-allarms-ordered.rds"))[[1]]
+dong_loos_6arms <- read_rds(here("Results", "dong-models1-5-allarms-ordered.rds"))[[2]]
 # add model 6, which ran separately
-
-dong_models_5arms[[6]] <- read_rds(here("Results", "dong-models6.rds"))[[1]][[1]]
-dong_loos_5arms[[6]] <- read_rds(here("Results", "dong-models6.rds"))[[2]][[1]]
 
 dong_models_6arms[[6]] <- read_rds(here("Results", "dong-models6-allarms.rds"))[[1]]
 dong_loos_6arms[[6]] <- read_rds(here("Results", "dong-models6-allarms.rds"))[[2]]
 
-round(summary(dong_models[[1]], pars = c("SD", "CORR", "lp__"))$summary, 4)
-round(summary(dong_models_6arms[[3]], pars = c("MU", "AR", "lp__"))$summary, 4)
+names(dong_models_6arms)[6] <- names(dong_loos_6arms)[6] <- "RHS-NS-SV"
+
+round(summary(dong_models_6arms[[6]], pars = c("MU", "AR", "lp__"))$summary, 4)
+round(summary(dong_models_6arms[[1]], pars = c("SD"))$summary, 4)
 
 waic(extract_log_lik(dong_models_6arms[[1]], parameter_name = "log_likelihood"))
 waic(extract_log_lik(dong_models_6arms[[6]], parameter_name = "log_likelihood"))
@@ -70,18 +66,15 @@ dat.dong2013 %>%
 
 ###### Table of AR posteriors for each model
 
-nsims <- dim(rstan::extract(dong_models_6arms[[1]], pars = "SD")$SD)[1]
+#nsims <- dim(rstan::extract(dong_models_6arms[[1]], pars = "SD")$SD)[1]
 
 corr.indices <- c(2:6, 9:12, 16:18, 23:24, 30)
 treatment.order <- levels(nma.dat.1$treatment)
 
 param.summaries.list <- list()
 
-mean.ci <- function(x){
-  return(c(mean(x), sd(x), quantile(x, .025), quantile(x, .975)))
-}
 
-for(i in 1:4){
+for(i in 1:length(dong_models_6arms)){
   
   # one row per parameter (SD, Correlations, AR, MU)
   param.summaries.list[[i]] <- as.data.frame(matrix(nrow = 6 + (6 * 5 / 2) + 6 + 6, ncol = 7))
@@ -115,25 +108,40 @@ param.summaries <- do.call(rbind, param.summaries.list)
 AR1 <- param.summaries %>%
   filter(str_detect(Parameter, "^AR"),
          !str_detect(Parameter, "1$")) %>%
-  ggplot(aes(x = Mean, y = Model, color = Model)) + 
+  ggplot(aes(x = Mean, y = Model, color = Model, shape = Model)) + 
   geom_point() +
   geom_linerange(aes(xmin = lower.ci, xmax = upper.ci, y = Model, color = Model)) +
+  scale_shape_manual(values = c(0, 2, 4, 15, 17, 19)) +
   facet_wrap(Treatment ~., nrow = 5) +
   theme_bw() +
   theme(text = element_text("LM Roman 10"),
-        legend.position = "none") +
+        #legend.position = "none",
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
   ylab(NULL) +
   xlab("Absolute Risk")
 
 AR2 <- param.summaries %>%
   filter(str_detect(Parameter, "AR1")) %>%
-  ggplot(aes(x = Mean, y = Model, color = Model)) + 
+  ggplot(aes(x = Mean, y = Model, color = Model, shape = Model)) + 
   geom_point() +
   geom_linerange(aes(xmin = lower.ci, xmax = upper.ci, y = Model, color = Model)) +
+  scale_shape_manual(values = c(0, 2, 4, 15, 17, 19)) +
   facet_wrap(Treatment ~., nrow = 1) +
   theme_bw() +
-  theme(text = element_text("LM Roman 10")) +
+  theme(text = element_text("LM Roman 10"),
+        axis.text.y = element_blank(),
+        legend.position = "none",
+        axis.ticks.y = element_blank()) +
   ylab(NULL) +
   xlab("Absolute Risk")
 
-AR1.2 <- grid.arrange(AR1, AR2, nrow = 1)
+pdf(file = here("Results", "dong-example-AR.pdf"),
+    height = 6, width = 6)
+
+AR1.2 <- grid.arrange(AR2, AR1, nrow = 1)
+
+dev.off()
+
+# ggsave("dong-example-AR.pdf", plot = AR1.2,
+#        device = "pdf", height = 6, width = 5, units = "in")
