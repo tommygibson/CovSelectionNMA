@@ -16,6 +16,7 @@ nma.std <- stan_model(here("Models", "AB-NMA.stan"))
 nma.lkj <- stan_model(here("Models", "AB-NMA-LKJ.stan"))
 nma.reglambda <- stan_model(here("Models", "AB-NMA-regularized-lambda.stan"))
 nma.RHS.NS <- stan_model(here("Models", "AB-NMA-RHS-NS.stan"))
+nma.RHS.SV <- stan_model(here("Models", "AB-NMA-sep-var-indep.stan"))
 nma.reglambda.sepvar <- stan_model(here("Models", "AB-NMA-sep-var-reglambda.stan"))
 nma.reglambda.sepvar.hier <- stan_model(here("Models", "AB-NMA-sep-var-hierarchical.stan"))
 nma.reglambda.sepvar.freegamma <- stan_model(here("Models", "AB-NMA-sepvar-hier-freegamma.stan"))
@@ -105,18 +106,23 @@ RHS.NS.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
                       scale_gamma = 1,
                       scale_global_lambda = tau0, nu_global_lambda = 3, nu_local_lambda = 1,
                       slab_scale_lambda = 2, slab_df_lambda = 4)
-RHS.CS.SV.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
-                             s = s, r = r, totaln = totaln,
-                             higher_better = 0, zeros = zeros,
-                             scale_gamma = 4,
-                             scale_global_lambda = tau0_sepvar, nu_global_lambda = 3, nu_local_lambda = 1,
-                             slab_scale_lambda = 2, slab_df_lambda = 4)
-RHS.NS.SV.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
-                                      s = s, r = r, totaln = totaln,
-                                      higher_better = 0, zeros = zeros,
-                                      scale_gamma = 1,
-                                      scale_global_lambda = tau0_sepvar, nu_global_lambda = 3, nu_local_lambda = 1,
-                                      slab_scale_lambda = 2, slab_df_lambda = 4)
+RHS.SV.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
+                      s = s, r = r, totaln = totaln,
+                      higher_better = 0, zeros = zeros,
+                      scale_global_lambda = tau0_sepvar, nu_global_lambda = 3, nu_local_lambda = 1,
+                      slab_scale_lambda = 2, slab_df_lambda = 4)
+# RHS.CS.SV.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
+#                              s = s, r = r, totaln = totaln,
+#                              higher_better = 0, zeros = zeros,
+#                              scale_gamma = 4,
+#                              scale_global_lambda = tau0_sepvar, nu_global_lambda = 3, nu_local_lambda = 1,
+#                              slab_scale_lambda = 2, slab_df_lambda = 4)
+# RHS.NS.SV.dat <- list(len = len, ntrt = ntrt, nstudy = nstudy, t = t,
+#                                       s = s, r = r, totaln = totaln,
+#                                       higher_better = 0, zeros = zeros,
+#                                       scale_gamma = 1,
+#                                       scale_global_lambda = tau0_sepvar, nu_global_lambda = 3, nu_local_lambda = 1,
+#                                       slab_scale_lambda = 2, slab_df_lambda = 4)
 
 
 # 
@@ -194,14 +200,22 @@ RHS.NS.ordered <- sampling(nma.RHS.NS,
                            #data = RHS.NS.dat, iter = 400, warmup = 200, cores = 4,
                            control = list(adapt_delta = 0.99, max_treedepth = 15),
                            seed = 919)
-RHS.CS.SV.ordered <- sampling(nma.reglambda.sepvar,
-                           pars = c("SD", "sigma_beta", "CORR",
-                                    "MU", "AR", "LOR", "log_likelihood"),
-                           data = RHS.CS.SV.dat, 
-                           iter = 6000, warmup = 2000, thin = 2, cores = 4,
-                           #iter = 400, warmup = 200, cores = 4,
-                           control = list(adapt_delta = 0.99, max_treedepth = 15),
-                           seed = 919)
+RHS.SV.ordered <- sampling(nma.RHS.SV,
+                              pars = c("SD", "sigma_beta",
+                                       "MU", "AR", "LOR", "log_likelihood"),
+                              data = RHS.SV.dat, 
+                              iter = 10000, warmup = 6000, thin = 2, cores = 4,
+                              #iter = 400, warmup = 200, cores = 4,
+                              control = list(adapt_delta = 0.99, max_treedepth = 15),
+                              seed = 919)
+# RHS.CS.SV.ordered <- sampling(nma.reglambda.sepvar,
+#                            pars = c("SD", "sigma_beta", "CORR",
+#                                     "MU", "AR", "LOR", "log_likelihood"),
+#                            data = RHS.CS.SV.dat, 
+#                            iter = 6000, warmup = 2000, thin = 2, cores = 4,
+#                            #iter = 400, warmup = 200, cores = 4,
+#                            control = list(adapt_delta = 0.99, max_treedepth = 15),
+#                            seed = 919)
 
 
 # round(summary(iw.ordered, pars =      c("SD", "CORR", "lp__"))$summary, 4)
@@ -220,7 +234,8 @@ log_lik[[1]] <- extract_log_lik(iw.ordered, parameter_name = "log_likelihood")
 log_lik[[2]] <- extract_log_lik(lkj.ordered, parameter_name = "log_likelihood")
 log_lik[[3]] <- extract_log_lik(RHS.CS.ordered, parameter_name = "log_likelihood")
 log_lik[[4]] <- extract_log_lik(RHS.NS.ordered, parameter_name = "log_likelihood")
-log_lik[[5]] <- extract_log_lik(RHS.CS.SV.ordered, parameter_name = "log_likelihood")
+log_lik[[5]] <- extract_log_lik(RHS.SV.ordered, parameter_name = "log_likelihood")
+#log_lik[[5]] <- extract_log_lik(RHS.CS.SV.ordered, parameter_name = "log_likelihood")
 #log_lik[[5]] <- extract_log_lik(fit.1.sepvar.freegamma, parameter_name = "log_likelihood")
 
 r_eff <- lapply(log_lik, function(x){
@@ -231,8 +246,8 @@ loo_list <- lapply(1:length(log_lik), function(j){
   loo::loo(log_lik[[j]], r_eff = r_eff[[j]])
 })
 
-models <- list(iw.ordered, lkj.ordered, RHS.CS.ordered, RHS.NS.ordered, RHS.CS.SV.ordered) # fit.1.sepvar.freegamma)
+models <- list(iw.ordered, lkj.ordered, RHS.CS.ordered, RHS.NS.ordered, RHS.SV.ordered) # fit.1.sepvar.freegamma)
 
-names(models) <- names(loo_list) <- c("IW", "LKJ", "RHS-CS", "RHS-NS", "RHS-CS-SV")
+names(models) <- names(loo_list) <- c("IW", "LKJ", "RHS-CS", "RHS-NS", "RHS-SV")
 
-write_rds(list(models, loo_list), file = here("Results", "dong-models1-5-allarms-ordered.rds"))
+write_rds(list(models, loo_list), file = here("Results", "dong-models-ordered.rds"))

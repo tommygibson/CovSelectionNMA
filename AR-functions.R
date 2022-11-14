@@ -15,9 +15,23 @@ get_AR <- function(mean.sd, M = 1000){
   
   return(apply(pred, 2, mean))
 }
+get_AR_SV <- function(mean.sd.beta, M = 1000){
+  ntrt <- floor((length(mean.sd.beta) - 1) / 2)
+  mu <- mean.sd.beta[1:ntrt]
+  sigma <- mean.sd.beta[(ntrt + 1):(2 * ntrt)]
+  sigma.beta <- mean.sd.beta[length(mean.sd.beta)]
+  tot_sd <- sqrt(sigma ^ 2 + sigma.beta ^ 2)
+  pred <- mapply(function(x, y){1 / (1 + exp(-rnorm(M, mean = x, sd = y)))},
+                 mu, tot_sd)
+  return(apply(pred, 2, mean))
+}
 
 get_full_AR <- function(mean.sd.mat, M = 1000){
   t(apply(X = mean.sd.mat, MARGIN = 1, FUN = get_AR, M = M))
+}
+
+get_full_AR_SV <- function(mean.sd.beta.mat, M = 1000){
+  t(apply(X = mean.sd.beta.mat, MARGIN = 1, FUN = get_AR_SV, M = M))
 }
 
 simple_summary <- function(x){
@@ -35,3 +49,17 @@ summarize_full_AR <- function(mean.sd.mat, M = 1000){
     return(t(apply(full_AR, 2, simple_summary)))
   }
 }
+
+summarize_full_AR_SV <- function(mean.sd.beta.mat, M = 1000){
+  
+  full_AR <- get_full_AR_SV(mean.sd.beta.mat, M = M)
+  
+  if(is.null(dim(full_AR))){
+    return(simple_summary(full_AR))
+  } 
+  
+  else {
+    return(t(apply(full_AR, 2, simple_summary)))
+  }
+}
+
