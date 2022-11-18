@@ -22,7 +22,7 @@ nstudy <- max(nma.dat.1$id)
 
 nma.dat.1$treatment <- factor(nma.dat.1$treatment,
                               levels = names(table(nma.dat.1$treatment))[order(table(nma.dat.1$treatment))])
-dong_6 <- read_rds(here("Results" , "dong-models6-allarms.rds"))[[1]]
+# dong_6 <- read_rds(here("Results" , "dong-models6-allarms.rds"))[[1]]
 
 # Results from Dong 2013 analysis wihtout treatment arm w/ only 2 observations 
 
@@ -48,16 +48,21 @@ dong_loos <- read_rds(here("Results", "dong-models-ordered.rds"))[[2]]
 
 # elpds_6arms <- as.data.frame(matrix(nrow = length(dong_loos_6arms), ncol = 3))
 elpds <- as.data.frame(matrix(nrow = length(dong_loos), ncol = 3))
-# elpds_6arms[,1] <- c("IW", "LKJ", "RHS-CS", "RHS-NS", "RHS-CS-SV", "RHS-NS-SV")
-elpds[, 1] <- c("IW", "LKJ", "RHS-CS", "RHS", "RHS-SV")
+
+elpds[, 1] <- 1:5
+elpds[, 2] <- c("IW", "LKJ", "RHS-CS", "RHS", "RHS-SV")
 for(i in 1:length(dong_loos)){
-  elpds[i, 2:3] <- dong_loos[[i]]$estimates[c(1, 3), 1]
+  elpds[i, 3] <- dong_loos[[i]]$estimates[1, 1]
 }
 
-names(elpds) <- c("Model", "ELPD", "LOOIC")
+names(elpds) <- c("Model #", "Model", "elpd")
+
+elpds <- elpds %>%
+  type_convert() %>%
+  arrange(desc(elpd))
 
 print(xtable(elpds, type = "latex", digits = 2),
-      file = here("Results", "SIM-elpds.tex"), include.rownames = FALSE)
+      file = here("Results", "SIM-elpds-sorted.tex"), include.rownames = FALSE)
 
 
 ###### Plot of dong data, showing that it's basically just study-level variation
@@ -166,21 +171,63 @@ AR2 <- param.summaries %>%
   ylab(NULL) +
   xlab("Absolute Risk")
 
-pdf(file = here("Results", "dong-example-AR.pdf"),
-    height = 6, width = 6)
-
-AR1.2 <- grid.arrange(AR2, AR1, nrow = 1)
-
-dev.off()
+# pdf(file = here("Results", "dong-example-AR.pdf"),
+#     height = 6, width = 6)
+# 
+# AR1.2 <- grid.arrange(AR2, AR1, nrow = 1)
+# 
+# dev.off()
 
 # ggsave("dong-example-AR.pdf", plot = AR1.2,
 #        device = "pdf", height = 6, width = 5, units = "in")
 
+#### Mean treatment effects (\mu_t)
+param.summaries %>% 
+  filter(str_detect(Parameter, "MU")) %>%
+  arrange(Treatment)
+
+param.summaries <- factor(param.summaries$Model,
+                                levels = c("IW", "LKJ", "RHS-CS", "RHS-NS", "RHS-SV"))
+(MU1 <- param.summaries %>%
+  filter(str_detect(Parameter, "^MU"),
+         !str_detect(Parameter, "1$")) %>%
+  ggplot(aes(x = Mean, y = Model, color = Model, shape = Model)) + 
+  geom_point() +
+  geom_linerange(aes(xmin = lower.ci, xmax = upper.ci, y = Model, color = Model)) +
+  scale_shape_manual(values = c(0, 2, 4, 15, 17)) +
+  facet_wrap(Treatment ~., nrow = 5) +
+  theme_bw() +
+  theme(axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  ylab(NULL) +
+  xlab(expression("Treatment Effect")) +
+    guides(color = guide_legend(reverse = TRUE),
+           shape = guide_legend(reverse = TRUE)))
+
+(MU2 <- param.summaries %>%
+  filter(str_detect(Parameter, "MU1")) %>%
+  ggplot(aes(x = Mean, y = Model, color = Model, shape = Model)) + 
+  geom_point() +
+  geom_linerange(aes(xmin = lower.ci, xmax = upper.ci, y = Model, color = Model)) +
+  scale_shape_manual(values = c(0, 2, 4, 15, 17)) +
+  facet_wrap(Treatment ~., nrow = 1) +
+  theme_bw() +
+  theme(axis.text.y = element_blank(),
+        legend.position = "none",
+        axis.ticks.y = element_blank()) +
+  ylab(NULL) +
+  xlab("Treatment Effect") +
+  guides(color = guide_legend(reverse = TRUE),
+         shape = guide_legend(reverse = TRUE)))
+
+MU1.2 <- cowplot::plot_grid(MU2, MU1, nrow = 1, rel_widths = c(.43, .57))
+
+ggsave(here("Figures", "dong-example-MU.pdf"), plot = MU1.2,
+       height = 5.5, width = 5.5, units = "in", dpi = 300, device = "pdf")
 
 
 ##### Doing AR the right way (MC method)
 
-iw.full <- do.call(cbind, rstan::extract(dong_models[[1]], pars = c("MU", "SD")))
 
 ARs.iw <- summarize_full_AR(do.call(cbind, rstan::extract(dong_models[[1]], pars = c("MU", "SD"))))
 ARs.lkj <- summarize_full_AR(do.call(cbind, rstan::extract(dong_models[[2]], pars = c("MU", "SD"))))
@@ -191,7 +238,7 @@ ARs.RHS.SV <- summarize_full_AR_SV(do.call(cbind, rstan::extract(dong_models[[5]
 ARs.all <- cbind.data.frame(rbind(ARs.iw, ARs.lkj, ARs.RHS.CS,
                                   ARs.RHS, ARs.RHS.SV),
                             rep(levels(nma.dat.1$treatment), 5),
-                            rep(c("IW", "LKJ", "RHS-CS", "RHS", "RHS-SV"), each = 6))
+                            rep(c("IW", "LKJ", "RHS-CS", "RHS-NS", "RHS-SV"), each = 6))
 
 names(ARs.all) <- c("Mean", "SD", "lower.ci", "upper.ci", "Treatment", "Model")
 rownames(ARs.all) <- NULL
@@ -206,12 +253,12 @@ AR1 <- ARs.all %>%
   scale_shape_manual(values = c(0, 2, 4, 15, 17)) +
   facet_wrap(Treatment ~., nrow = 5) +
   theme_bw() +
-  theme(text = element_text("LM Roman 10"),
-        #legend.position = "none",
-        axis.text.y = element_blank(),
+  theme(axis.text.y = element_blank(),
         axis.ticks.y = element_blank()) +
   ylab(NULL) +
-  xlab("Absolute Risk")
+  xlab("Absolute Risk") +
+  guides(color = guide_legend(reverse = TRUE),
+         shape = guide_legend(reverse = TRUE))
 
 AR2 <- ARs.all %>%
   filter(Treatment == "TIO-SMI") %>%
@@ -221,16 +268,17 @@ AR2 <- ARs.all %>%
   scale_shape_manual(values = c(0, 2, 4, 15, 17)) +
   facet_wrap(Treatment ~., nrow = 1) +
   theme_bw() +
-  theme(text = element_text("LM Roman 10"),
-        axis.text.y = element_blank(),
+  theme(axis.text.y = element_blank(),
         legend.position = "none",
         axis.ticks.y = element_blank()) +
   ylab(NULL) +
-  xlab("Absolute Risk")
+  xlab("Absolute Risk") +
+  guides(color = guide_legend(reverse = TRUE),
+         shape = guide_legend(reverse = TRUE))
 
-pdf(file = here("Results", "dong-example-AR-MC.pdf"),
-    height = 6, width = 6)
+pdf(file = here("Figures", "dong-example-AR-MC.pdf"),
+    height = 5.5, width = 5.5)
 
-AR1.2 <- grid.arrange(AR2, AR1, nrow = 1)
+AR1.2 <- cowplot::plot_grid(AR2, AR1, nrow = 1, rel_widths = c(.43, .57))
 
 dev.off()

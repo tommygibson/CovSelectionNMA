@@ -5,14 +5,16 @@ library(MASS)
 library(here)
 library(extrafont)
 library(xtable)
+library(tidyverse)
 
 source(here("CTS-functions.R"))
-
+rstan_options(auto_write = TRUE)
 
 re3.std.model <- stan_model(here("Models", "3RE.stan"))
 re3.iw.model <- stan_model(here("Models", "3RE-IW.stan"))
 re3.lkj.model <- stan_model(here("Models", "3RE-LKJ.stan"))
 re3.reglambda.model <- stan_model(here("Models", "3RE-regularized-lambda-cholesky.stan"))
+
 
 # either 3, 5, or 7 studies (to mimic syncope data)
 # S <- c(3, 5, 7)
@@ -61,9 +63,12 @@ sd.nu.hat <- sd(nu.hat)
 sd.beta.hat <- sd(beta.hat)
 sd.delta.hat <- sd(delta.hat)
 
-sd.sd.nu.hat <- sd.nu.hat * sqrt(1 - 2 / (S - 1) * (gamma(S / 2) / gamma((S - 1) / 2))^2)
-sd.sd.beta.hat <- sd.beta.hat * sqrt(1 - 2 / (S - 1) * (gamma(S / 2) / gamma((S - 1) / 2))^2)
-sd.sd.delta.hat <- sd.delta.hat * sqrt(1 - 2 / (S - 1) * (gamma(S / 2) / gamma((S - 1) / 2))^2)
+# sd.sd.nu.hat <- sd.nu.hat * sqrt(1 - 2 / (S - 1) * (gamma(S / 2) / gamma((S - 1) / 2))^2)
+# sd.sd.beta.hat <- sd.beta.hat * sqrt(1 - 2 / (S - 1) * (gamma(S / 2) / gamma((S - 1) / 2))^2)
+# sd.sd.delta.hat <- sd.delta.hat * sqrt(1 - 2 / (S - 1) * (gamma(S / 2) / gamma((S - 1) / 2))^2)
+sd.sd.nu.hat <- sd.nu.hat * gamma((S - 1) / 2) / gamma(S / 2) * sqrt((S - 1) / 2 - (gamma(S / 2) / gamma((S - 1) / 2))^2)
+sd.sd.beta.hat <- sd.beta.hat * gamma((S - 1) / 2) / gamma(S / 2) * sqrt((S - 1) / 2 - (gamma(S / 2) / gamma((S - 1) / 2))^2)
+sd.sd.delta.hat <- sd.delta.hat * gamma((S - 1) / 2) / gamma(S / 2) * sqrt((S - 1) / 2 - (gamma(S / 2) / gamma((S - 1) / 2))^2)
 
 (corhat.1.2 <- cor(beta.hat, delta.hat))
 (corhat.1.3 <- cor(beta.hat, nu.hat))
@@ -85,11 +90,11 @@ re3.dat.reglambda <- list(S = S, y1 = y[,1], y0 = y[,2], n1 = n[,1], n0 = n[,2],
                           slab_scale_lambda = 1, slab_df_lambda = 4)
 
 re3.stan <- sampling(re3.std.model, data = re3.dat.stan,
-                     chains = 4, iter = 4000,
+                     chains = 4, cores = 4, iter = 4000,
                      control = list(adapt_delta = 0.99, max_treedepth = 15),
                      seed = 714)
 re3.iw.stan <- sampling(re3.iw.model, data = re3.dat.stan,
-                        chains = 4, iter = 4000,
+                        chains = 4, cores = 4, iter = 4000,
                         pars = c("theta0", "SD", "CORR", "Sigma"),
                         seed = 715)
 
@@ -173,45 +178,122 @@ corr.means <- corr.sims %>%
             x.sd = -1.01,
             y.sd = max(ifelse(str_detect(parameter, "nu"), 3250, 825)))
 
+breaks_fun <- function(x){
+  if(max(x) < 1.5){
+    seq(0, 1, 0.5)
+  }
+  else if(max(x) < 2){
+    seq(0, 1.5, 0.5)
+  } else seq(0, 2, 0.5)
+}
 
-sd.sims %>%
-  ggplot(aes(x = samples)) +
-  geom_histogram(bins = 40) +
-  facet_grid(parameter ~ model,
-             scales = "free",
-             labeller = label_parsed) +
-  xlim(c(0, 1.75)) +
-  theme_bw() +
-  geom_text(data = sd.means, aes(x = x.mean, y = y.mean, label = paste0("Mean = ", mean)),
-            size = 6 * .36, family = "LM Roman 10",
-            hjust = 0) +
-  geom_text(data = sd.means, aes(x = x.median, y = y.median, label = paste0("Med. = ", median)),
-            size = 6 * .36, family = "LM Roman 10",
-            hjust = 0)
+(sd.plot.1 <- sd.sims %>%
+    filter(str_detect(parameter, "beta")) %>%
+    ggplot(aes(x = samples, color = model)) +
+    geom_density(adjust = 1.5) + #, show.legend = FALSE) +
+    facet_wrap( ~ parameter,
+               labeller = label_parsed) +
+    #xlim(c(0, 1.75)) +
+    theme_bw() +
+    labs(x = "",
+         y = "") +
+    xlim(c(0, 1.5)) +
+    theme(
+      legend.text = element_text(color = "white"),
+      legend.title = element_text(color = "white"),
+      legend.key = element_rect(fill = "white"),
+      axis.text.x = element_text(size = 8)
+    ) + 
+    scale_color_discrete(
+      guide = guide_legend(override.aes = list(color = "white"))
+    ))
+(sd.plot.2 <- sd.sims %>%
+    filter(str_detect(parameter, "delta")) %>%
+    ggplot(aes(x = samples, color = model)) +
+    geom_density(adjust = 1.5) + #, show.legend = FALSE) +
+    facet_wrap(~ parameter,
+                labeller = label_parsed) +
+    #xlim(c(0, 1.75)) +
+    theme_bw() +
+    labs(x = "",
+         y = "density") +
+    xlim(c(0, 2)) +
+    scale_color_discrete(name = "Model") +
+    theme(axis.text.x = element_text(size = 8)))
+(sd.plot.3 <- sd.sims %>%
+    filter(str_detect(parameter, "nu")) %>%
+    ggplot(aes(x = samples, color = model)) +
+    geom_density(adjust = 1.5) +
+    facet_wrap( ~ parameter,
+                labeller = label_parsed) +
+    #xlim(c(0, 1.75)) +
+    theme_bw() +
+    labs(x = "SD", 
+         y = "") +
+    scale_color_discrete(guide = guide_legend(override.aes = list(color = "white"))) +
+    xlim(c(0, 1)) +
+    theme(legend.text = element_text(color = "white"),
+          legend.title = element_text(color = "white"),
+          legend.key = element_rect(fill = "white"),
+          axis.text.x = element_text(size = 8)))
 
-corr.plot <-
+
+(sd.plot <- cowplot::plot_grid(sd.plot.1, sd.plot.2, sd.plot.3, nrow = 3))#,
+                              #rel_widths = c(.29, .29, .42)))
+
+ggsave(here("Figures", "3re-synthetic-sd-plot.pdf"), plot = sd.plot,
+       height = 5, width = 5, units = "in", device = "pdf", dpi = 300)
+  # geom_text(data = sd.means, aes(x = x.mean, y = y.mean, label = paste0("Mean = ", mean)),
+  #           size = 6 * .36, family = "LM Roman 10",
+  #           hjust = 0) +
+  # geom_text(data = sd.means, aes(x = x.median, y = y.median, label = paste0("Med. = ", median)),
+  #           size = 6 * .36, family = "LM Roman 10",
+  #           hjust = 0)
+
+# corr.plot <-
+#   corr.sims %>%
+#   ggplot(aes(x = samples)) + 
+#   geom_histogram(bins = 40) + 
+#   facet_grid(parameter ~ model,
+#              scales = "free",
+#              labeller = label_parsed) +
+#   xlim(c(-1.01, 1.01)) +
+#   xlab("Correlation") +
+#   ylab("Samples") +
+#   theme_bw() +
+#   theme(text = element_text(size = 12, family = "LM Roman 10"),
+#         axis.text.x = element_text(size = 8)) +
+#   geom_text(data = corr.means, aes(x = x.mean, y = y.mean, label = paste0("Mean = ", mean)),
+#             size = 6 * .36, family = "LM Roman 10",
+#             hjust = 0) +
+#   geom_text(data = corr.means, aes(x = x.sd, y = y.sd, label = paste0("SD = ", sd)),
+#             size = 6 * .36, family = "LM Roman 10",
+#             hjust = 0)
+
+(corr.plot <-
   corr.sims %>%
-  ggplot(aes(x = samples)) + 
-  geom_histogram(bins = 40) + 
-  facet_grid(parameter ~ model,
+  ggplot(aes(x = samples, color = model)) + 
+  geom_density(adjust = 2) + 
+  facet_wrap( ~ parameter,
              scales = "free",
              labeller = label_parsed) +
   xlim(c(-1.01, 1.01)) +
   xlab("Correlation") +
-  ylab("Samples") +
   theme_bw() +
-  theme(text = element_text(size = 12, family = "LM Roman 10"),
-        axis.text.x = element_text(size = 8)) +
-  geom_text(data = corr.means, aes(x = x.mean, y = y.mean, label = paste0("Mean = ", mean)),
-            size = 6 * .36, family = "LM Roman 10",
-            hjust = 0) +
-  geom_text(data = corr.means, aes(x = x.sd, y = y.sd, label = paste0("SD = ", sd)),
-            size = 6 * .36, family = "LM Roman 10",
-            hjust = 0)
+  scale_color_discrete(name = "Model") +
+  theme(axis.text.x = element_text(size = 8))) # +
+  # theme(text = element_text(size = 12, family = "LM Roman 10"),
+  #       axis.text.x = element_text(size = 8)) +
+  # geom_text(data = corr.means, aes(x = x.mean, y = y.mean, label = paste0("Mean = ", mean)),
+  #           size = 6 * .36, family = "LM Roman 10",
+  #           hjust = 0) +
+  # geom_text(data = corr.means, aes(x = x.sd, y = y.sd, label = paste0("SD = ", sd)),
+  #           size = 6 * .36, family = "LM Roman 10",
+  #           hjust = 0)
 
-# ggsave(here("Figures", "3re-synthetic-corr-plot.pdf"), corr.plot,
-#        width = 5, height = 5, units = "in", device = "pdf",
-#        dpi = 300)
+ggsave(here("Figures", "3re-synthetic-corr-plot.pdf"), corr.plot,
+       width = 5, height = 5, units = "in", device = "pdf",
+       dpi = 300)
 
 reglambda.sims <- make_mean_var_sims(rstan::extract(re3.reglambda, pars = c("theta0", "Sigma")))
 lkj.sims <- make_mean_var_sims(rstan::extract(re3.lkj.stan, pars = c("theta0", "Sigma")))
